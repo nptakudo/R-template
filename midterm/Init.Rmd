@@ -1,0 +1,48 @@
+---
+title: "Init"
+output: html_document
+---
+
+# R env setup
+
+## Install renv package
+
+```{r}
+install.packages("renv")
+# press y in the console 
+```
+
+## Sync predefined packages
+
+```{r}
+renv::restore()
+```
+
+## Install new if needed
+
+Better to install the packages used in the example file to avoid errors:
+
+```{r}
+install.packages(c("dplyr", "ggplot2", "readr", "tidyr"))
+## or in console:
+# renv::install(c("dplyr", "ggplot2", "readr", "tidyr"))
+```
+
+## Sync installed packages
+
+Sync to ensure all packages are up to date:
+
+```{r}
+renv::snapshot()
+```
+
+## Troubleshooting
+
+### renv Not Activating Automatically
+
+If renv doesn't activate when you open the project:
+
+```{r}
+source("renv/activate.R")
+renv::restore()
+```
