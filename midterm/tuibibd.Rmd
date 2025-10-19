@@ -1,0 +1,303 @@
+---
+title: "Midterm Exam Solution Script"
+author: "Your Name - Your Student ID"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: readable
+    toc: yes
+    toc_float: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+# This chunk sets up the R Markdown environment. You don't need to change it.
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# 1. Initial Setup
+
+This section clears the environment and loads all the libraries you will
+likely need for the exam. Run this chunk first.
+
+```{r initial_setup}
+# Clear all variables from the workspace
+rm(list=ls())
+
+# Load all necessary libraries
+library(ggplot2)  # For plotting
+library(caTools)  # For train/test splits (sample.split)
+library(ROCR)     # For ROC curves and AUC
+library(leaps)    # For best subset selection (regsubsets)
+library(MASS)     # For LDA and QDA
+library(psych)    # For pairs.panels()
+```
+
+----------------------------------------------------------
+
+# Problem 1: [Enter Problem Name, e.g., USCrime Dataset]
+
+## (a) Load and Inspect Data
+
+```{r}
+# Load the dataset
+#install.packages("MASS") 
+library(MASS)
+```
+
+```{r}
+boston <- data(Boston)
+head(boston)
+
+model_full <- lm( ~ ., data=boston)
+```
+
+```{# Initial inspection}
+
+
+str(data1)
+summary(data1)
+
+# Find rows with min/max if needed
+# min_row <- data1[which.min(data1$ColumnName), ]
+# max_row <- data1[which.max(data1$ColumnName), ]
+```
+
+**Answer for (a):** \* [Write your findings here, e.g., "The state with
+the lowest crime rate is..."]
+
+## (b, c, d) Data Exploration & Hypothesis Testing
+
+```{r p1_explore_ttest}
+# Subset data if needed for comparison
+# group1 <- subset(data1, ColumnName > value)
+# group2 <- subset(data1, ColumnName <= value)
+
+# Calculate grouped means if needed
+# mean(group1$Outcome)
+# mean(group2$Outcome)
+
+# Perform a t-test if asked
+# t.test(group1$Outcome, group2$Outcome)
+```
+
+**Answer for (b):** \* [Write your calculated means here.]
+
+**Answer for (c):** \* Null Hypothesis (H₀): [Write the null hypothesis
+here, e.g., "The true mean outcomes for the two groups are equal."]
+
+**Answer for (d):** \* P-value: [Get from `t.test` output.] \*
+Conclusion: [State whether you reject or fail to reject H₀.]
+
+## (e, f, g) Simple Linear Regression & Prediction
+
+```{r p1_simple_lm}
+# Create training and test sets if required
+# train1 <- data1[1:42, ]
+# test1 <- data1[43:47, ]
+
+# Fit the simple linear model
+model_simple <- lm(Outcome ~ Predictor, data = train1)
+
+# Get the R-squared value
+# summary(model_simple)$r.squared
+
+# Predict on new data with a confidence interval
+# specific_case <- test1[2, ]
+# predict(model_simple, newdata = specific_case, interval = "confidence", level = 0.99)
+```
+
+**Answer for (e):** \* R-squared: [Value from `summary()`.]
+
+**Answer for (f):** \* Confidence Interval: [lwr, upr] from `predict()`.
+\* Is the actual value within the interval? [Yes/No]
+
+**Answer for (g):** \* [Repeat for another case.]
+
+## (h, i, j) Multiple Linear Regression & Model Comparison
+
+```{r p1_multi_lm}
+# Fit a model with all predictors
+model_multi_all <- lm(Outcome ~ ., data = train1)
+# summary(model_multi_all)
+
+# Identify significant variables (p-value < 0.05) from the summary above
+
+# Fit a refined model with only significant predictors
+# model_multi_sig <- lm(Outcome ~ SigVar1 + SigVar2, data = train1)
+# summary(model_multi_sig)
+
+# Compare models using Adjusted R-squared (higher is better)
+# summary(model_simple)$adj.r.squared
+# summary(model_multi_all)$adj.r.squared
+# summary(model_multi_sig)$adj.r.squared
+```
+
+**Answer for (h):** \* Significant variables: [List them.] \* R-squared:
+[Value from `summary()`.]
+
+**Answer for (i):** \* R-squared for new model: [Value from
+`summary()`.]
+
+**Answer for (j):** \* Preferred Model: [e.g., model_multi_sig] \*
+Criteria: Adjusted R-squared.
+
+## (k, l, m) Automated Subset Selection
+
+```{r p1_subset_selection}
+# Best subset selection
+model_subsets <- regsubsets(Outcome ~ ., data = train1, nvmax = 15)
+summary_subsets <- summary(model_subsets)
+
+# Find best model by Adjusted R-squared (higher is better)
+# which.max(summary_subsets$adjr2)
+
+# Find best model by BIC (lower is better)
+# which.min(summary_subsets$bic)
+
+# Forward stepwise selection
+# model_fwd <- regsubsets(Outcome ~ ., data = train1, method = "forward", nvmax = 15)
+# summary_fwd <- summary(model_fwd)
+# which.min(summary_fwd$bic)
+```
+
+**Answer for (k), (l), (m):** \* [Write down the number of variables
+included in the best model for each criterion.]
+
+## (n, o, p) Out-of-Sample Validation (Test Set SSE)
+
+```{r p1_test_sse}
+# This is the final validation. The model with the lowest Test Set SSE wins.
+
+# Example for model from part (k)
+# 1. Get predictor names from the best model
+# predictors_k <- names(coef(model_subsets, id = NumberOfVarsFrom_k))[-1]
+# 2. Build the formula
+# formula_k <- as.formula(paste("Outcome ~", paste(predictors_k, collapse="+")))
+# 3. Fit the model ON THE TRAINING DATA
+# final_model_k <- lm(formula_k, data = train1)
+# 4. Predict ON THE TEST DATA
+# predictions_k <- predict(final_model_k, newdata = test1)
+# 5. Calculate Test SSE
+# sse_k <- sum((predictions_k - test1$Outcome)^2)
+
+# Repeat for models from (l) and (m)
+```
+
+**Answer for (n), (o), (p):** \* Test SSE for (k): [Value of `sse_k`.]
+\* Test SSEs for (l), (m): [Calculate and write values.] \* Preferred
+Model: [The model with the lowest Test Set SSE.]
+
+------------------------------------------------------------------------
+
+# Problem 2: [Enter Problem Name, e.g., Songs Dataset]
+
+## (a, b, c) Load Data & Create Train/Test Splits
+
+```{r p2_load_split}
+# Load data
+data2 <- read.csv("FileName2.csv")
+
+# Data exploration if needed (e.g., for Michael Jackson songs)
+# mj_songs <- subset(data2, artistname == "Michael Jackson")
+# nrow(mj_songs)
+# sum(mj_songs$Top10)
+# table(data2$time_signature)
+
+# Create training and test sets
+train2 <- subset(data2, year <= 2008)
+test2 <- subset(data2, year > 2008)
+```
+
+**Answer for (a), (b), (c):** \* [Write your findings here.]
+
+## (d) Fit Initial Logistic Model
+
+```{r p2_initial_glm}
+# Remove non-predictor variables if needed
+# nonvars <- c("year", "songtitle", "artistname", "songID", "artistID")
+# train2_clean <- train2[, !(names(train2) %in% nonvars)]
+# test2_clean <- test2[, !(names(test2) %in% nonvars)]
+
+# Fit the logistic regression model
+model1_glm <- glm(Top10 ~ ., data = train2_clean, family = "binomial")
+
+# Get the AIC (lower is better)
+# model1_glm$aic
+```
+
+**Answer for (d):** \* AIC: [Value from model.]
+
+## (f, g, h) Multicollinearity & Model Refinement
+
+```{r p2_multicollinearity}
+# Check correlation between suspected variables
+# cor(train2_clean$loudness, train2_clean$energy)
+
+# Model 2 (remove loudness)
+# model2_glm <- glm(Top10 ~ . - loudness, data = train2_clean, family = "binomial")
+# summary(model2_glm) # Check the coefficient for 'energy' now
+
+# Model 3 (remove energy)
+# model3_glm <- glm(Top10 ~ . - energy, data = train2_clean, family = "binomial")
+# model3_glm$aic
+```
+
+**Answer for (f), (g), (h):** \* [Write your findings on correlation,
+coefficient changes, and AIC values.]
+
+## (i, j) Prediction & Evaluation on Test Set
+
+```{r p2_evaluation}
+# Make predictions ON THE TEST SET (use the chosen model, e.g., Model 3)
+predictions <- predict(model3_glm, newdata = test2_clean, type = "response")
+
+# Create confusion matrix with the specified threshold (e.g., 0.40)
+conf_matrix <- table(Actual = test2_clean$Top10, Predicted = predictions > 0.40)
+# print(conf_matrix)
+
+# Calculate Model Accuracy
+# accuracy <- (conf_matrix[1,1] + conf_matrix[2,2]) / sum(conf_matrix)
+
+# Calculate Baseline Accuracy (always predict the majority class)
+# baseline_accuracy <- table(test2_clean$Top10)[1] / nrow(test2_clean)
+
+# Calculate Sensitivity and Specificity from the confusion matrix
+# sensitivity <- conf_matrix[2,2] / (conf_matrix[2,1] + conf_matrix[2,2])
+# specificity <- conf_matrix[1,1] / (conf_matrix[1,1] + conf_matrix[1,2])
+```
+
+**Answer for (i), (j):** \* [Write your calculated Accuracy, Baseline
+Accuracy, Sensitivity, and Specificity.]
+
+## (k) Calculate AUC
+
+```{r p2_auc}
+# Use the predictions from the previous chunk
+pred_rocr <- prediction(predictions, test2_clean$Top10)
+auc_performance <- performance(pred_rocr, "auc")
+auc_value <- auc_performance@y.values[[1]]
+```
+
+**Answer for (k):** \* AUC Value: [Value of `auc_value`.]
+
+## (l, m, n) Alternative Model (e.g., Probit) & Final Comparison
+
+```{r p2_probit}
+# Identify significant variables from a previous model (e.g., Model 3)
+# summary(model3_glm)
+
+# Fit the Probit model with only those significant variables
+# model4_probit <- glm(Top10 ~ SigVar1 + SigVar2, data = train2_clean, family = binomial(link = "probit"))
+
+# Predict and evaluate Model 4 using the same steps as in chunk p2_evaluation
+```
+
+**Answer for (l), (m), (n):** \* [Write down the Accuracy, Sensitivity,
+and Specificity for the Probit model.] \* [Justify your final model
+choice by comparing the test set performance (Accuracy, AUC, etc.) of
+the candidate models.]
+
+---s
