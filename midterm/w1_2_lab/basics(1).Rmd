@@ -1,0 +1,492 @@
+---
+title: "Week 1 Lecture 1: R Basics"
+author: "Bikramjit Das"
+date: "Fall 2025"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+---
+
+# Preliminaries
+
+Check [bookdown](http://bookdown.org) for R Markdown and other information, tutorial on R and R studio.
+
+## R environment in R Markdown
+
+Use `ctrl+alt+i` to create the R environment
+
+## Current directory
+```{r}
+getwd()
+```
+
+## Help function
+```{r}
+help(getwd)
+?getwd
+```
+
+## Set directory
+   Setting the current working directory
+```{r}
+# install.packages("here")
+library(here)
+setwd(here())
+```
+
+## List the files in a directory
+```{r}
+dir(here())
+```
+
+
+## List objects 
+  Listing objects stored in the R workspace
+```{r}
+ls()
+```
+  
+
+## Variable assignments
+
+Assign a number to a variable.
+```{r}
+x <- 75 + 3
+x
+x = 75 # Alternative to assigning a number to a variable. In general '<-' is preferred for assignment.
+x
+```
+
+
+## Common functions 
+   
+    exponential, inverse, power, addition
+    
+```{r}
+exp(x)
+1 / x
+x^3
+y <- x + 4
+z <- x + y
+y
+z
+```
+    
+## Remove variables from the workspace
+```{r}
+ls()
+rm(y) # removes variable y
+ls()
+rm(list=ls()) # Clears the environment ... removes all variables
+ls()
+```
+
+# Numbers and vectors
+
+## Concatenation
+   Concatenate (combine) numbers to form a vector
+```{r}
+x<-c(1,2,pi,55,45)
+x
+
+```
+
+## Accessing elements
+   Access specific elements of the vector
+```{r}
+x[3]
+
+```
+
+## Applying operations to a vector 
+   term by term inverse, concatenate vectors, exponentiation
+```{r}
+x
+1 / x
+y<-c(x,0,x)
+y
+library(microbenchmark)
+x <- 1:1000000
+microbenchmark(y <- 2 * x)
+for (i in 1:1000000) {
+  x[i] <- 2 * x[i]
+}
+
+```
+
+You can overload the sum operator by recycling the shorter vector - mathematically adding vectors of different sizes are not permitted 
+
+```{r}
+x <- c(2,3,3)
+y <- c(1,2,3,4)
+x+y ## be careful while adding ... no one other than you is checking :)
+
+x <- c(2, 3, 3, 2, -1)
+y <- c(1, 2, 3, 4)
+x + y
+
+```
+
+
+## Maximum and minimum
+Finding the maximum and minimum elements and identifying the location (index) of the first max and all max
+```{r}
+max(x)
+min(y)
+which.max(x)
+?which.max
+which(x==max(x))
+y
+```
+
+## Other operations 
+  - sum, product, mean, variance, standard deviation
+```{r}
+sum(x)
+cumsum(x)
+prod(x)
+cumprod(x)
+mean(x)
+sd(x)
+var(x)
+summary(x)
+```
+
+For a vector, *summary* it provides a six number summary including min, max, mean, 1st quartile, median and 3rd quartile. This can be used with other objects too.
+
+## Maximum entry in a concatenated vector
+```{r}
+max(x,y)
+```
+
+
+## Parallel maximum
+```{r}
+pmax(x,y)
+?pmax
+```
+
+
+Parallel maximum returns a vector of length equal to the longest argument that contains in each element, the largest element in that position of any of the vector.
+
+## Generating vectors using a variety of commands
+```{r}
+x<- -3:8
+x
+
+y<- seq(-3,8,0.2)
+y
+
+z<- seq(-3,8,length=8)
+z
+
+rep(x, times=3)
+
+rep(x, each=3)
+
+
+```
+
+## Return logical vector based on the check
+
+```{r}
+x>1
+
+```
+
+## Dealing with missing entries 
+```{r}
+is.na(x)
+?is.na
+y<-c(x,NA)
+is.na(y)
+
+```
+
+
+## Differences in assignments
+   Using <- vs = vs ==.
+```{r}
+exp(a <- 1:5)
+a
+exp(a == 1:5)  ### What is happening here?
+a = 5
+a == 5
+```
+   
+   
+
+# Classes or types
+
+R stores objects in a variety of classes - *numeric, integer, character, logical, list, matrix, dataframe* and has logical overriding operations when you convert from one class to another.
+
+## Variety of classes
+```{r}
+z<-0:9
+z
+class(z)
+
+z1<-c('a','b')
+class(z1)
+
+w<-as.character(z)  ## convert to character
+class(w)
+
+as.integer(w) ## convert back to integer
+
+as.logical(c(5,0))
+
+z>1
+
+as.numeric(z>1)
+
+w<-c(1,"a")
+class(w)
+
+a <- c(1,2,3,4,5)
+b <- c(1,2,3,4,'a')
+
+
+```
+
+
+
+## Factors 
+
+```{r}
+ct<- c("jap","kor","sin","kor","jap","sin","sin")
+class(ct)
+
+fct<-factor(ct)
+fct
+levels(fct) # something like 'set' in python / c++
+
+summary(fct)
+
+table(fct) ### alternatively
+
+```
+
+## The function apply
+  The functions apply, sapply and tapply are very useful
+
+```{r}
+income<-c(500,1200,4000,2300,2300,1234,1345)
+income
+tapply(income,fct,mean)
+?tapply
+
+med<-data.frame(patient=1:100, age=rnorm(100, mean=60,sd=12),treatment= gl(2,50,labels=c("Treatment","Control")))
+?gl
+head(med)
+
+tapply(med$age, med$treatment, mean)
+library(dplyr)
+medgrp <- med %>% group_by(treatment) %>% summarise(mean(age), sd(age))
+
+
+?apply  ### Check!!
+```
+
+
+## Matrix and arrays
+
+### Matrix operations
+
+```{r}
+?matrix
+
+r<-matrix(3:8,nrow=3,ncol=2)
+rt <- t(r) # transpose
+r %*% rt # matrix multiplication
+r
+dim(r)
+r[2,2]
+
+r[5]
+r[1, ]
+
+rownames(r)<- c("Jack","Jane","Jules")
+colnames(r)<-c("apples","oranges")
+rownames(r)
+
+
+
+class(r)
+
+
+```
+
+
+### Array operations
+
+```{r}
+?array
+c <- array(1:16, c(2, 2, 2, 2))
+c
+s <- array(3:8, c(3, 2))
+s
+
+z <- 1:50
+z
+
+dim(z) <- c(5, 2, 5)
+
+z[5, 2, ]
+
+class(z)
+
+```
+
+
+### Other operations with matrices
+
+```{r}
+diag(10)
+?cbind
+cbind(c(1,2,3),c(4,5,6))
+rbind(c(1,2,3),c(4,5,6))
+
+```
+
+
+### Matrix multiplication
+
+```{r}
+y<-matrix(1:6,nrow=3,ncol=2)
+z<-matrix(3:8,nrow=3,ncol=2)
+y
+z
+y*z
+y%*%t(z)
+
+x <- c(1,2,3)
+2 %in% x
+
+help("%*%")
+```
+
+
+### Solutions of linear equations
+```{r}
+a<-array(c(2,1,-1,2),c(2,2))
+b<-c(4,4)
+a
+b
+solve(a,b)
+solve(a)
+
+?solve
+```
+
+
+### Eigen decomposition of a matrix
+Find $\lambda$ (eigenvalues) such that $|A_\lambda I|=0$ and corresponding $\boldsymbol{x}$ (eigenvectors) such that $A\boldsymbol{x}=\lambda \boldsymbol{x}$.
+```{r}
+E<-eigen(a)
+E$values
+E$vectors
+```
+
+
+## Lists 
+List consists of an ordered collection of objects that can be of different or the same type.
+
+```{r}
+?list
+Paul<-list(age=44,sex="M",affiliation=c("Atreides","Fremen"))
+class(Paul)
+Paul
+
+Leia<-list(age=54, sex="M",affiliation=c("Rebel Alliance","New Republic","Resistance"))
+Leia
+
+Leia[1]
+
+Leia[[3]]
+
+class(Leia[1])
+
+class(Leia[[1]])
+
+
+fchar<-c(Paul,Leia)
+fchar
+class(fchar)
+
+fchar[1]
+fchar[3]
+```
+
+
+
+## Dataframes
+
+Dataframes are a tightly coupled collection of variables that share many of the properties of matrices and lists and is the fundamental data structure that will be used in most of this course.
+
+```{r}
+?data.frame
+A<-data.frame(name=c("Paul","Leia"), ages=c(44,54), affiliation=c(2,3))
+A$spouse<-c("Irulan","Han")
+A
+
+```
+
+
+
+## Tibbles and dplyr
+```{r}
+library(tidyverse)
+library(data.table)
+library(dplyr)
+starwars
+class(starwars)
+## %>%  Command+Shift+M
+starwars %>% dim()
+dim(starwars)
+
+starwars %>% summary()
+
+starwars %>% select(mass) %>% summary()
+summary(select(starwars, mass))
+
+
+summary(starwars$mass)
+
+starwars %>% filter(sex=="female")
+starwars[starwars$sex == "female", ]
+
+starwars %>% arrange(desc(height))
+
+starwars %>% slice_head(n=3)
+
+sbmi<-starwars %>% mutate(name, bmi =mass/((height/100)^2)) %>% select(name,height,mass, bmi)
+starwars$bmi <- starwars$mass/((starwars$height/100)^2)
+
+sbmi
+
+swsmy <- starwars %>% group_by(homeworld) %>% summarise(meanmass = mean(mass))
+
+swsmy
+
+badidx <- !is.na(swsmy$meanmass)
+swsmy <- swsmy[badidx, ]
+
+swsmy
+```
+
+```{r}
+FC<-tribble(
+  ~name, ~age, ~affiliation, ~spouse,
+  "Paul", 44, c("Atreides","Fremen"), "Irulan",
+  "Leia", 54, c("Rebel Alliance","New Republic","Resistance"), "Han")
+FC
+
+class(FC)
+```
+
+END OF LECTURE 1.
