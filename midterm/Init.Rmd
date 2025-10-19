@@ -16,6 +16,7 @@ install.packages("renv")
 
 ```{r}
 renv::restore()
+# press y in the console 
 ```
 
 ## Install new if needed
