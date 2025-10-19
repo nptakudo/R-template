@@ -28,12 +28,19 @@ install.packages(c("dplyr", "ggplot2", "readr", "tidyr"))
 # renv::install(c("dplyr", "ggplot2", "readr", "tidyr"))
 ```
 
+## Check if inconsistent packages
+
+```{r}
+renv::status()
+```
+
 ## Sync installed packages
 
 Sync to ensure all packages are up to date:
 
 ```{r}
 renv::snapshot()
+# press y in the console
 ```
 
 ## Troubleshooting

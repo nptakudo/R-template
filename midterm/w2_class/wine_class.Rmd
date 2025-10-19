@@ -2,7 +2,7 @@
 title: "Linear regression: wine analytics"
 author: "Bikramjit Das"
 date: "2025"
-output: 
+output:
   prettydoc::html_pretty:
     theme: cayman
     highlight: github
@@ -88,7 +88,7 @@ summary(model1)
 #autoplot(...) # uses the ggfortify package
 ```
 
-The regression fit here is $$LPRICE = 72.99-0.0378*VINT.$$ 
+The regression fit here is $$LPRICE = 72.99-0.0378*VINT.$$
 Both estimated coefficients are significant at the 0.01 level with $R^2 = 0.2005$ and adjusted-$R^2 = 0.1657.$
 We plot the best fit line which has a slope of $-0.0378.$
 
@@ -166,7 +166,7 @@ model5  <- lm(LPRICE~HRAIN+DEGREES,data=winetrain)
 summary(model5)
 ```
 We obtain the following regression model:
-$$LPRICE = -10.69 + 0.602*DEGREES - 0.0045*HRAIN.$$ 
+$$LPRICE = -10.69 + 0.602*DEGREES - 0.0045*HRAIN.$$
 Both variables are highly significant under this model  with $R^2 = 0.7$ and adjusted-$R^2 = 0.68.$
 
 ## Multiple linear regression
@@ -195,7 +195,7 @@ Under this model we have $R^2 = 0.828$ and adjusted-$R^2 = 0.794$. The coefficie
 model7alt <- lm(LPRICE~WRAIN+DEGREES+HRAIN,data=winetrain)
 summary(model7alt)
 ```
- 
+
  We also obtain estimated coefficients for a linear regression model after dropping VINT but this decreases $R^2$ to 0.75 and adjusted $R^2$ to 0.71.
 
 
@@ -208,13 +208,13 @@ We can obtain confidence intervals for the estimates using the `confint` command
 model4$coefficients
 #model4$residuals
 confint(model4)
-confint(model4,level=0.99) ## End of class Sep 30 
+confint(model4,level=0.99) ## End of class Sep 30
 ```
- 
 
-# Predictions  
+
+# Predictions
  The `predict` function helps predict the outcome of the model on values in the test set.
- 
+
 ```{r}
 str(winetest)
 wineprediction7 <- predict(model7, newdata=winetest)
@@ -225,14 +225,14 @@ exp(cbind(wine$LPRICE[28:29],wineprediction7[1:2]))
 
 
  The $R^2$ values obtained from the training data are as follows:
- 
+
    1. Model 4: $R^2=0.435$;
-   
+
    2. Model 5: $R^2=0.707$;
-   
+
    3. Model 7: $R^2=0.828$.
-   
-Now we find this for the test data set.  
+
+Now we find this for the test data set.
 
 ```{r}
 sst <-sum((winetest$LPRICE[1:2]-mean(winetrain$LPRICE))^2) ## winetrain instead of winetest in this case due to small test set
@@ -255,9 +255,9 @@ R2_5
 ```
 
 
-We use the training mean to compute the total sum of squares for computing the test $R^2$ values (since the test set has so few values, if you have  more values in the test set, no need to resort to this). The results indicate that better $R^2$ in the training set does not necessarily indicate better $R^2$ in test set (this can also be negative as seen in `Model 5`). 
+We use the training mean to compute the total sum of squares for computing the test $R^2$ values (since the test set has so few values, if you have  more values in the test set, no need to resort to this). The results indicate that better $R^2$ in the training set does not necessarily indicate better $R^2$ in test set (this can also be negative as seen in `Model 5`).
 
-The use of logarithms for prices is fairly common in the economics literature - partly justified by skewed values in some datasets dealing with numbers such as salaries and partly justified by functional relations such as $y = \exp(a+bx)$ which gives $\log y = a+bx.$ Such transformations need to be justified and is sometime specific to domains. Even if one directly uses prices in the regression, similar insights are found in this dataset. 
+The use of logarithms for prices is fairly common in the economics literature - partly justified by skewed values in some datasets dealing with numbers such as salaries and partly justified by functional relations such as $y = \exp(a+bx)$ which gives $\log y = a+bx.$ Such transformations need to be justified and is sometime specific to domains. Even if one directly uses prices in the regression, similar insights are found in this dataset.
 
 ```{r}
 library(ggplot2)

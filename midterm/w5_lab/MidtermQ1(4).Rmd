@@ -1,0 +1,203 @@
+---
+title: 'Midterm Question 1: 2019'
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document: default
+---
+
+Question 1: <http://www.statsci.org/data/general/uscrime.html>
+
+Criminologists are interested in the effect of punishment regimes on crime rates. This has been studied using aggregate data on 47 states of the USA for 1960. The data set **USCrime.csv** contains the following columns:
+
+Variable	 	Description
+M		    percentage of males aged 14--24 in total state population 
+So		  indicator variable for a southern state   
+Ed		  mean years of schooling of the population aged 25 years or over  
+Po1		  per capita expenditure on police protection in 1960  
+Po2		  per capita expenditure on police protection in 1959
+LF		  labour force participation rate of civilian urban males in the age-group 14-24
+M.F		  number of males per 100 females
+Pop		  state population in 1960 in hundred thousands
+NW		  percentage of nonwhites in the population
+U1		  unemployment rate of urban males 14???24
+U2		  unemployment rate of urban males 35???39
+Wealth	wealth: median value of transferable assets or family income
+Ineq		income inequality: percentage of families earning below half the median income
+Prob		probability of imprisonment: ratio of number of commitments to number of offenses
+Time		average time in months served by offenders in state prisons before their first release
+Crime		crime rate: number of offenses per 100,000 population in 1960
+
+Our goal in this study is to find which factors affect crime rate using this dataset.
+
+(a) Read the data into the dataframe *UScrime*.  Which state has the lowest and which state has the highest crime rates respectively in 1960?
+Ans. New Hampshire and Nevada
+```{r}
+UScrime <-read.csv("UScrime.csv")
+UScrime[which.min(UScrime$Crime),]$State
+UScrime[which.max(UScrime$Crime),]$State
+```
+(b)  Find the average crime rate (*Crime*) in states where per capita expenditure on police protection in 1960 was above US\$ 8. Also find the  average crime rate for states where per capita expenditure on police protection in 1960 was less than or equal to  US\$ 8. 
+
+Ans. 1137.826 and 682.0417
+```{r}
+mean(UScrime[UScrime$Po1>8,]$Crime)
+mean(UScrime[UScrime$Po1<=8,]$Crime)
+```
+
+(c)   Run a two-sample t-test to verify if there is difference in crime rates for states spending more than 8 dollars per month and states spending less than or equal to 8 dollars per month on police protection (1960). Write down the null hypothesis for your test.
+
+Ans. $$H_0: \beta_1 = \beta_2$$ vs. $$H_1: \beta_1 \neq \beta_2$$
+
+(d) For the test conducted in part (c) write down the p-value and your conclusion.
+
+
+Ans. P-value = 2.74471e-05. We reject null.
+
+```{r}
+ ttest<-t.test(UScrime[UScrime$Po1>8,]$Crime,UScrime[UScrime$Po1<=8,]$Crime)
+ttest$p.value
+
+```
+
+(e) In this question, you will develop a simple linear regression model. Use the data on the first 42 states to fit the model. Use the subset function and remove the "States" variable by using argument select=-States. Let this data set be UStrain.
+
+Create a simple linear regression model to fit the Crime rates of a state against their per capita expenditure on police protection ().
+
+What is the R-squared for your model?
+Ans.   0.4985
+```{r}
+UStrain<-subset(UScrime[1:42,], select=-States)
+UStest<-subset(UScrime[43:47,], select=-States)
+simple1<-lm(Crime~Po1,data=UStrain)
+summary(simple1)
+```
+
+(f) Create a dataset for testing the model by choosing the 43rd to 47th states (VA, WA, WV, WI, WY). Call this set UStest (remove the States variable as before). What is the 99\% confidence interval for the predicted crime rate for Washington (WA)? Is the actual value within this interval? 
+
+Ans. Interval = (889.5083, 1139.268).   Actual = 1030. It is inside.
+```{r}
+pred1<-predict(simple1,newdata=UStest,interval=c("confidence"),level=.99)
+pred1
+pred1[2,2]
+pred1[2,3]
+UStest$Crime[2]
+
+UScrime$Crime[which(UScrime$State=="WA")]
+```
+
+(g) What is the 99\% confidence interval for the predicted crime rate for Wisconsin (WI)? Is the actual value within this interval? 
+
+Ans. Interval = (971.1244, 1259.29).   Actual = 508. It is NOT in the interval.
+```{r}
+pred1[4,2]
+pred1[4,3]
+UStest$Crime[4]
+```
+
+(h) Now develop a multiple linear regression model using data on the first 45 states (created earlier) to predict Crime rates using all available predictor variables (and intercept). Which variables are significant at 0.05 level and what is the R-squared for this model?
+
+Ans. M, Ed, Ineq. Rsquared= 0.8434 
+
+```{r}
+lmtotal<-lm(Crime~.,data=UStrain)
+summary(lmtotal)
+
+```
+
+(i) Using only the variables that you found significant at 0.05 level (p-value less than 0.05) in the previous model in part (h), create a new linear regression model. What is the R-squared for the new model?
+Ans. 0.1025
+
+```{r}
+lmselect<-lm(Crime~M+Ed+Ineq,data=UStrain)
+summary(lmselect)
+```
+
+(j) Among the models you created in parts (e), (h) and (i) which one would you prefer? What comparison criteria did you use to come to your conclusion?
+Ans. Adjusted R2. Model (h).
+Otherwise if we use test SSE:
+```{r}
+predsim<-predict(simple1,newdata = UStest)
+SSEsim= mean((predsim-UStest$Crime)^2)
+SSEsim
+predlmt<-predict(lmtotal,newdata = UStest)
+SSElmt= mean((predlmt-UStest$Crime)^2)
+SSElmt
+predlmsel<-predict(lmselect,newdata = UStest)
+SSElmsel= mean((predlmsel-UStest$Crime)^2)
+SSElmsel
+
+```
+
+
+(k)  We now use the **regsubsets** function in the **leaps** package for a best subset selection. How many variables are included in the model if you use adjusted R-squared to pick your model?
+Ans. 10
+
+```{r}
+library(leaps)
+modsubex<-regsubsets(Crime~.,data=UStrain,nvmax=15)
+summary(modsubex)$adjr2
+idx <- which.max(summary(modsubex)$adjr2)
+length(coef(modsubex, idx)) - 1 # -1 for intercept
+coef(modsubex, idx)
+```
+
+(l) How many variables are selected if you use BIC to pick your model with best subset selection?
+Ans. 8
+```{r}
+summary(modsubex)$bic
+idx <- which.min(summary(modsubex)$bic)
+length(coef(modsubex, idx)) - 1
+coef(modsubex, idx)
+
+```
+
+
+(m) How many variables are selected if you use BIC to pick your model with forward stepwise subset selection?
+
+Ans. 7
+```{r}
+modsubforward<-regsubsets(Crime~.,data=UStrain,method="forward")
+summary(modsubforward)$bic
+idx <- which.min(summary(modsubforward)$bic)
+length(coef(modsubex, idx)) - 1
+coef(modsubex, idx)
+
+```
+
+(n) Now using UStest set for your out-of-sample validation, you are asked to choose one of
+the models from parts (k), (l), and (m). Create separate multiple linear regression models
+using the predictors found in parts (k), (l) and (m). Use these models to find the sum-of-
+squared errors (SSE) for the UStest data set. 
+
+What is the test set SSE for the model in part (k)?
+
+Ans. SSEK = 507749.7
+```{r}
+ModK<-lm(Crime~M+Ed+Po1+LF+M.F+U1+U2+Wealth+Ineq+Prob,data=UStrain)
+PredK<-predict(ModK,newdata = UStest)
+SSEK= sum((PredK-UStest$Crime)^2)
+
+ModL<-lm(Crime~M+Ed+Po1+M.F+U1+U2+Ineq+Prob,data=UStrain)
+PredL<-predict(ModL,newdata = UStest)
+SSEL= sum((PredL-UStest$Crime)^2)
+
+ModM<-lm(Crime~M+Ed+Po1+M.F+Wealth+Ineq+Prob,data=UStrain)
+PredM<-predict(ModM,newdata = UStest)
+SSEM= sum((PredM-UStest$Crime)^2)
+
+SSEK
+SSEL
+SSEM
+```
+(o) What are the test set SSE for the models in parts (l) and (m)?
+
+Ans. SSEL= 358031.2, SSEM = 436948
+
+(p) Which model do you prefer among the ones created in parts (k), (l) and (m) based on your
+findings above?
+
+Ans. The lowest SSE is for model (l), which we choose.
+
+END
+
