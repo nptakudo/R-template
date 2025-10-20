@@ -10,9 +10,11 @@ output:
     toc_depth: 2
     number_sections: yes
 ---
+
 # Preliminaries
 
 ## Attaching packages
+
 ```{r}
 rm(list=ls())
 #install.packages("ggplot2")
@@ -26,6 +28,7 @@ library("ggfortify")
 ## Wine dataset
 
 The data set consists of 38 observations of 6 variables (a small data set): 1952 to 1989. Orley Ashenfelter published his paper in 1990.
+
 ```{r}
 wine <- read.csv("wine.csv")
 str(wine)
@@ -42,24 +45,21 @@ is.na(wine)
 
 # Visualization
 
-
 ## Scatter plot: vintage vs. log-price
+
 The scatter plot indicates a negative relationship but there is considerable variation that still needs to be captured. We can also plot a matrix of all pairwise scatter plots.
 
 ```{r}
 ggplot(wine, aes(VINT,LPRICE)) + geom_point(na.rm=T)+geom_smooth(method="lm",na.rm=T,se=F)
 ```
 
-
 ## Scatter plot of all pairs
+
 ```{r}
 pairs.panels(wine,ellipses = F, lm =T, breaks=10, hist.col="blue")  ## uses the psych package
 ## ggpairs(wine) #uses the GGally package
 ## pairs(wine)
 ```
-
-
-
 
 # Fitting a model
 
@@ -74,12 +74,12 @@ winetest <- subset(wine,wine$VINT>1978)
 winetest
 ```
 
-
-
 ## Single variable regression
+
 One variable regression - `lm()` is the basic command to fit a linear model to the data.
 
 ### Model 1: log-price vs. vintage
+
 ```{r}
 ?lm
 model1  <- lm(LPRICE~VINT,data=winetrain)
@@ -88,9 +88,7 @@ summary(model1)
 #autoplot(...) # uses the ggfortify package
 ```
 
-The regression fit here is $$LPRICE = 72.99-0.0378*VINT.$$
-Both estimated coefficients are significant at the 0.01 level with $R^2 = 0.2005$ and adjusted-$R^2 = 0.1657.$
-We plot the best fit line which has a slope of $-0.0378.$
+The regression fit here is $$LPRICE = 72.99-0.0378*VINT.$$ Both estimated coefficients are significant at the 0.01 level with $R^2 = 0.2005$ and adjusted-$R^2 = 0.1657.$ We plot the best fit line which has a slope of $-0.0378.$
 
 ```{r}
 ggplot(winetrain, aes(VINT,LPRICE))+geom_point(na.rm=T)+ geom_smooth(method="lm",na.rm = T,se=F)
@@ -106,35 +104,36 @@ R2<-1 - sse1/sst1  ### we did a direct computation but our model also gives an a
 R2
 ```
 
-
 The result indicates that older the wine, greater is the value but there is still significant variation.
 
 ### Model 2: log-price vs. winter rain
+
 ```{r}
 model2  <- lm(LPRICE~WRAIN,data=winetrain)
 summary(model2)
 ```
 
 ### Model 3: log-price vs. harvest rain
+
 ```{r}
 model3  <- lm(LPRICE~HRAIN,data=winetrain)
 summary(model3)
 ```
 
 ### Model 4: log-price vs. temperature
+
 ```{r}
 model4  <- lm(LPRICE~DEGREES,data=winetrain)
 summary(model4)
 ```
 
-
 In conclusion, it seems a one-explanatory-variable regression model is not sufficient to explain the price of wine.
 
 ## Two variable regression
- The two variables selected are temperature (DEGREES) and harvest rain (HRAIN) and we want to find their effect on log-price (LPRICE).
+
+The two variables selected are temperature (DEGREES) and harvest rain (HRAIN) and we want to find their effect on log-price (LPRICE).
 
 ### Visualisation
-
 
 ```{r}
 ggplot(winetrain,aes(DEGREES,HRAIN))+geom_point()
@@ -161,17 +160,18 @@ ggplot(winetrain,aes(DEGREES,HRAIN,color=cut(LPRICE,c(-Inf,-1.42,Inf)),label=VIN
 The figure indicates that hot and dry summers produce wines that obtain higher prices while cooler summers with more rain gives lower priced wines. 1961 is an year where an extremely high quality wine was produced.
 
 ### Model 5: two variable regression
+
 ```{r}
 model5  <- lm(LPRICE~HRAIN+DEGREES,data=winetrain)
 summary(model5)
 ```
-We obtain the following regression model:
-$$LPRICE = -10.69 + 0.602*DEGREES - 0.0045*HRAIN.$$
-Both variables are highly significant under this model  with $R^2 = 0.7$ and adjusted-$R^2 = 0.68.$
+
+We obtain the following regression model: $$LPRICE = -10.69 + 0.602*DEGREES - 0.0045*HRAIN.$$ Both variables are highly significant under this model with $R^2 = 0.7$ and adjusted-$R^2 = 0.68.$
 
 ## Multiple linear regression
 
 ### Model 6: log-price vs. all variables
+
 ```{r}
 model6  <- lm(LPRICE~.,data=winetrain)
 summary(model6)
@@ -181,6 +181,7 @@ cor(winetrain)
 Note that TIME_SV coefficient is not available in the model as it is perfectly correlated with the VINT variable (perfect multi-collinearity). We drop the variable and redo the regression. High correlation (in absolute value) between independent variables is not good (indication of multi-collinearity) while high correlation (in absolute value) between dependent and independent variables is good
 
 ### Model 7: log-price vs. all (relevant) variables
+
 ```{r}
 model7  <- lm(LPRICE~VINT+HRAIN+WRAIN+DEGREES,data=winetrain)
 summary(model7)
@@ -191,14 +192,13 @@ plot(model7)
 Under this model we have $R^2 = 0.828$ and adjusted-$R^2 = 0.794$. The coefficients indicate that high quality wines correlate strongly in a positive manner with summer temperatures, negatively correlate with harvest rain and positively correlate with winter rain. The result indicates that 80% of the variation can be explained by including the weather variables in comparison to 20% with only the vintage year.
 
 ### Model 7alt: log-price vs. winter rain, harvest rain and temperature
+
 ```{r}
 model7alt <- lm(LPRICE~WRAIN+DEGREES+HRAIN,data=winetrain)
 summary(model7alt)
 ```
 
- We also obtain estimated coefficients for a linear regression model after dropping VINT but this decreases $R^2$ to 0.75 and adjusted $R^2$ to 0.71.
-
-
+We also obtain estimated coefficients for a linear regression model after dropping VINT but this decreases $R^2$ to 0.75 and adjusted $R^2$ to 0.71.
 
 ## Confidence intervals
 
@@ -211,9 +211,9 @@ confint(model4)
 confint(model4,level=0.99) ## End of class Sep 30
 ```
 
-
 # Predictions
- The `predict` function helps predict the outcome of the model on values in the test set.
+
+The `predict` function helps predict the outcome of the model on values in the test set.
 
 ```{r}
 str(winetest)
@@ -223,14 +223,13 @@ cbind(c(1979,1980),wine$LPRICE[28:29],wineprediction7[1:2])
 exp(cbind(wine$LPRICE[28:29],wineprediction7[1:2]))
 ```
 
+The $R^2$ values obtained from the training data are as follows:
 
- The $R^2$ values obtained from the training data are as follows:
+1.  Model 4: $R^2=0.435$;
 
-   1. Model 4: $R^2=0.435$;
+2.  Model 5: $R^2=0.707$;
 
-   2. Model 5: $R^2=0.707$;
-
-   3. Model 7: $R^2=0.828$.
+3.  Model 7: $R^2=0.828$.
 
 Now we find this for the test data set.
 
@@ -254,8 +253,7 @@ R2_5
 
 ```
 
-
-We use the training mean to compute the total sum of squares for computing the test $R^2$ values (since the test set has so few values, if you have  more values in the test set, no need to resort to this). The results indicate that better $R^2$ in the training set does not necessarily indicate better $R^2$ in test set (this can also be negative as seen in `Model 5`).
+We use the training mean to compute the total sum of squares for computing the test $R^2$ values (since the test set has so few values, if you have more values in the test set, no need to resort to this). The results indicate that better $R^2$ in the training set does not necessarily indicate better $R^2$ in test set (this can also be negative as seen in `Model 5`).
 
 The use of logarithms for prices is fairly common in the economics literature - partly justified by skewed values in some datasets dealing with numbers such as salaries and partly justified by functional relations such as $y = \exp(a+bx)$ which gives $\log y = a+bx.$ Such transformations need to be justified and is sometime specific to domains. Even if one directly uses prices in the regression, similar insights are found in this dataset.
 

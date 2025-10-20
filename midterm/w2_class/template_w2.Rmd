@@ -1,0 +1,198 @@
+---
+title: "Lm w2"
+author: "TomNgx"
+date: "2025"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+---
+
+### 🎯 **1. Preliminaries: Loading and Exploring Data**
+
+This is the foundational first step of any analysis. For an exam, you need to know how to load data and get a quick overview of its characteristics.
+
+#### **Key Concepts:**
+
+-   **Package Loading:** Using external R packages to get additional functions.
+-   **Data Inspection:** Understanding the structure, data types, and summary statistics of your dataset.
+-   **Identifying Missing Data:** A crucial step before modeling.
+
+#### **R Code & Explanation:**
+
+1.  **Load Packages:**
+
+    ```{r}
+    library("ggplot2")  # For advanced plotting
+    library("psych")    # For the pairs.panels() function
+    library("ggfortify") # For model diagnostic plots
+    ```
+
+    -   **What it does:** The `library()` function loads an installed package into your current R session, making its functions available.
+
+2.  **Load and Summarize Data:**
+
+    ```{r}
+    wine <- read.csv("wine.csv") # Reads the data from a CSV file into a dataframe named 'wine'
+    str(wine)                    # Shows the 'str'ucture: variable names, data types (int, num), and first few observations.
+    summary(wine)                # Provides descriptive statistics for each variable (Min, Max, Mean, Median, Quartiles).
+    ```
+
+    -   **Interpretation:** `str()` and `summary()` are your first-look tools. The output shows 6 variables. Crucially, `summary(wine)` reveals that the `LPRICE` variable has 11 `NA`s (missing values).
+
+3.  **Check for Missing Data Explicitly:**
+
+    ```{r}
+    # is.na(wine)
+    ```
+
+    -   **What it does:** Returns a TRUE/FALSE matrix indicating the position of any `NA` values in the dataframe. This confirms the missing prices noted in the summary.
+
+------------------------------------------------------------------------
+
+### 📊 **2. Data Visualization**
+
+Before building a model, you should visualize the relationships between your variables to form hypotheses.
+
+#### **Key Concepts:**
+
+-   **Scatter Plots:** To visualize the relationship between two continuous variables.
+-   **Correlation:** To numerically measure the strength and direction of a linear relationship.
+-   **Pairwise Analysis:** Looking at all variable combinations at once.
+
+#### **R Code & Explanation:**
+
+1.  **Scatter Plot with Regression Line (`ggplot2`):**
+
+    ```{r}
+    ggplot(wine, aes(VINT, LPRICE)) +
+      geom_point(na.rm=T) +
+      geom_smooth(method="lm", na.rm=T, se=F)
+    ```
+
+    -   **What it does:** This creates a scatter plot of `LPRICE` against `VINT`.
+        -   `geom_point()` adds the individual data points. `na.rm=T` tells it to ignore missing values.
+        -   `geom_smooth(method="lm")` overlays a linear regression line (`lm`). `se=F` removes the confidence interval shading.
+    -   **Interpretation:** The plot shows a negative linear relationship: as the vintage year (`VINT`) increases (i.e., the wine gets younger), the log-price tends to decrease.
+
+2.  **Pairwise Scatter Plot Matrix (`psych`):**
+
+    ```{r}
+    pairs.panels(wine, ellipses = F, lm = T)
+    ```
+
+    -   **What it does:** A powerful function that creates a matrix of plots. For each pair of variables, it shows:
+        -   A scatter plot with a regression line (`lm=T`).
+        -   The Pearson correlation coefficient.
+        -   A histogram of each variable's distribution on the diagonal.
+    -   **Interpretation:** This gives a quick overview of all relationships. You can see `DEGREES` has a strong positive correlation with `LPRICE` (0.66) and `HRAIN` has a strong negative correlation (-0.56).
+
+------------------------------------------------------------------------
+
+### ⚙️ **3. Model Fitting and Interpretation**
+
+This is the core of the lab, where you build and analyze different linear models.
+
+#### **Key Concepts:**
+
+-   **Train/Test Split:** Separating data to train the model and then test its performance on unseen data.
+-   **Linear Model (`lm`):** The function used to fit linear regression models.
+-   **Model Summary:** Understanding coefficients, p-values, R-squared, and Adjusted R-squared.
+-   **Multicollinearity:** When predictor variables are highly correlated with each other, which can make model coefficients unstable.
+
+#### **R Code & Explanation:**
+
+1.  **Splitting the Data:**
+
+    ```{r}
+    winetrain <- subset(wine, wine$VINT <= 1978 & !is.na(wine$LPRICE))
+    winetest <- subset(wine, wine$VINT > 1978)
+    ```
+
+    -   **What it does:** The `subset()` function filters the data to create a training set (vintages up to 1978 with no missing prices) and a test set (vintages after 1978).
+
+2.  **Fitting a Linear Model (`lm`):**
+
+    -   **Formula Syntax:** `lm(dependent_variable ~ independent_variable1 + independent_variable2, data = ...)`
+
+    <!-- end list -->
+
+    ```{r}
+    # Single variable model
+    model4 <- lm(LPRICE ~ DEGREES, data=winetrain)
+
+    # Multiple variable model
+    model7 <- lm(LPRICE ~ VINT + HRAIN + WRAIN + DEGREES, data=winetrain)
+
+    # All variables
+    #model_all <- lm(LPRICE ~ ., data=winetrain)
+
+    ```
+
+3.  **Interpreting the Model (`summary`):**
+
+    ```{r}
+    summary(model7)
+    ```
+
+    -   **Coefficients (Estimate):** These are the model's parameters.
+        -   **(Intercept):** The expected value of `LPRICE` when all predictors are zero.
+        -   **Other Coefficients (e.g., `DEGREES`):** For a one-unit increase in `DEGREES`, `LPRICE` is expected to increase by `0.607`, holding all other variables constant. The negative coefficient for `HRAIN` (`-0.0039`) means more harvest rain is associated with lower prices.
+    -   **P-values (Pr(\>\|t\|)):** Indicates the significance of each predictor. A small p-value (typically \< 0.05, marked with `*`) means the variable is a statistically significant predictor. In `model7`, all variables are significant.
+    -   **Multiple R-squared:** The proportion of variance in the dependent variable (`LPRICE`) that is explained by the model. For `model7`, **R-squared is 0.8286**, meaning the model explains about 82.9% of the variation in log-price.
+    -   **Adjusted R-squared:** Similar to R-squared but it adjusts for the number of predictors in the model. It's better for comparing models with different numbers of variables. Here it is **0.7943**.
+
+4.  **Identifying Multicollinearity:** The lab notes that `VINT` and `TIME_SV` have a perfect correlation of -1. When `lm(LPRICE ~ ., data=winetrain)` is run, R automatically detects this and gives `NA` for one of the coefficients (`TIME_SV`). This is a classic sign of perfect multicollinearity.
+
+    ```{r}
+    cor(winetrain) # This would show the correlation matrix and highlight the issue.
+    ```
+
+5.  **Confidence Intervals:**
+
+    ```{r}
+    confint(model4, level=0.99)
+    ```
+
+    -   **What it does:** Calculates the confidence intervals for the model coefficients. For `model4`, we can be 99% confident that the true coefficient for `DEGREES` lies between 0.211 and 1.059.
+
+------------------------------------------------------------------------
+
+### 🧪 **4. Prediction and Model Evaluation on Test Data**
+
+A model is only useful if it performs well on new, unseen data.
+
+#### **Key Concepts:**
+
+-   **Prediction:** Using a trained model to predict outcomes for new data points.
+-   **Out-of-Sample R-squared:** A measure of how well the model performs on the test set. It can be negative if the model is worse than simply guessing the average.
+
+#### **R Code & Explanation:**
+
+1.  **Make Predictions:**
+
+    ```{r}
+    wineprediction7 <- predict(model7, newdata=winetest)
+    wineprediction7
+    ```
+
+    -   **What it does:** The `predict()` function takes the fitted model (`model7`) and the new data (`winetest`) and outputs the predicted `LPRICE` values.
+
+2.  **Calculate Test R-squared:** This measures how good the predictions are.
+
+    ```{r}
+    # Total Sum of Squares (using the TRAINING data mean)
+    sst <- sum((winetest$LPRICE[1:2] - mean(winetrain$LPRICE))^2)
+    sst
+    # Sum of Squared Errors (difference between actual and predicted)
+    sse7 <- sum((wineprediction7[1:2] - winetest$LPRICE[1:2])^2)
+    sse7
+    # Test R-squared
+    R2_7 <- 1 - sse7/sst
+    R2_7
+    ```
+
+    -   **Interpretation:** The lab shows that **`model7` has a high test R-squared (0.79)**, indicating good predictive performance. However, `model5` has a **negative test R-squared (-0.08)**, showing it performs very poorly on new data, even worse than a naive model that just predicts the average price every time. This highlights the danger of overfitting on the training data.
