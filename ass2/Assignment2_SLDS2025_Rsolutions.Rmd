@@ -1,0 +1,823 @@
+---
+title: "Assignment 2: Statistical Learning for Data Science"
+date: "2025"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+---
+
+## Attaching packages
+```{r}
+rm(list=ls())
+#install.packages("ggplot2")
+#install.packages("psych")
+#install.packages("ggfortify")
+library("ggplot2")
+library("psych")
+library("ggfortify")
+```
+
+# Questions on Linear regression
+
+9. This problem involves the `Boston` dataset. This data was part of an important paper in 1978 by Harrison and Rubinfeld titled **Hedonic housing prices and the demand for clean air** published in the *Journal of Environmental Economics and Management 5(1): 81-102*. The dataset has the following fields:  
+* `crim`: per capita crime rate by town  
+* `zn`: proportion of residential land zoned for lots over 25,000 sq.ft
+* `indus`: proportion of non-retail business acres per town
+* `chas`: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)  
+* `nox`: nitrogen oxides concentration (parts per 10 million)
+* `rm`: average number of rooms per dwelling  
+* `age`: proportion of owner-occupied units built prior to 1940  
+* `dis`: weighted mean of distances to five Boston employment centres  
+* `rad`: index of accessibility to radial highways  
+* `tax`: full-value property-tax rate per \$10,000  
+* `ptratio`: pupil-teacher ratio by town  
+* `black`: $1000(Bk-0.63)^2$ where Bk is the proportion of black residents by town   
+* `lstat`: lower status of the population (percent)  
+* `medv`: median value of owner-occupied homes in \$1000s  
+We will try to predict the median house value using thirteen predictors.
+(a) For each predictor, fit a simple linear regression model using a single variable to predict the response. In which of these models is there a statistically significant relationship between the predictor and the response? Plot the figure of relationship between medv and lstat as an example to validate your finding.  
+*Answer.* We show linear model for `model1` and `model13` below. It should be done for all models to check that the p-values are close to zero for testing $H_0: \beta_j=0$ for $j=1,\ldots,13$.
+
+```{r}
+boston <- read.csv("Boston.csv")
+colnames(boston)
+model1 <- lm(medv~crim, data=boston)
+model2 <- lm(medv~zn, data=boston)
+model3 <- lm(medv~indus, data=boston)
+model4 <- lm(medv~chas, data=boston)
+model5 <- lm(medv~nox, data=boston)
+model6 <- lm(medv~rm, data=boston)
+model7 <- lm(medv~age, data=boston)
+model8 <- lm(medv~dis, data=boston)
+model9 <- lm(medv~rad, data=boston)
+model10 <- lm(medv~tax, data=boston)
+model11 <- lm(medv~ptratio, data=boston)
+model12 <- lm(medv~black, data=boston)
+model13 <- lm(medv~lstat, data=boston)
+
+summary(model1)
+
+# Verify this for all the models by checking that the p-values are close to 0.
+
+summary(model13)
+ggplot(boston,aes(lstat,medv))+geom_point(na.rm=T)+geom_smooth(method="lm",na.rm=T,se=F)
+
+
+```
+
+
+(b) Fit a multiple linear regression models to predict your response using all the predictors. Compare the adjusted $R^2$ from this model with the simple regression model. For which predictors, can we reject the null hypothesis $H_0:\beta_j=0$?  
+*Answer.*  The adjusted $R^2$ is 0.7338 which is larger than the adjusted $R^2$ from any of the
+simple regression models. The variables for which we can reject the $H_0: \beta_j=0$ are `crim,
+zn, chas, nox, rm, dis, rad, tax, ptratio, black, lstat` at the 0.05 significance level.
+
+```{r}
+modelall<- lm(medv~., data=boston)
+summary(modelall)
+attr(modelall$coefficients, "names")[modelall$coefficients <= 0.05]
+```
+
+(c) Create a plot displaying the univariate regression coefficients from (a) on the X-axis and the multiple regression coefficients from (b) on the Y-axis. That is each predictor is displayed as a single point in the plot. Comment on this plot.  
+*Answer.* The figure seems to indicate a fairly positive relationship between the results from the simple and multiple linear regression models. The relationship seems to be linear too.
+```{r}
+Ind <- c(model1$coef[2], model2$coef[2], model3$coef[2], model4$coef[2], model5$coef[2],
+model6$coef[2], model7$coef[2], model8$coef[2], model9$coef[2], model10$coef[2],
+model11$coef[2], model12$coef[2], model13$coef[2])
+All <- modelall$coef[2:14]
+ggplot(cbind(Ind,All),aes(Ind,All)) + geom_point()+geom_smooth(method="lm",se=F)+ggtitle("Coefficient relationship") + xlab("Simple linear regression") + ylab("Multiple linear regression")
+```
+
+
+(d) In this question, we will check if there is evidence of non-linear association between the `lstat` predictor variable and the response? To answer the question, fit a model of the form  
+`medv` =  $\beta_0$+ $\beta_0$`lstat` + $\beta_0$`lstat2` + $\epsilon$.  
+You can make use of the `poly()` function in R. Does this help improve the fit? Add higher degree polynomials to  fit the data. What is the degree of the polynomial fit beyond which the terms no longer remain significant?  
+*Answer.* Yes, adding higher-degree terms helps improve the fit. Beyond degree 5, adding additional terms does not seem to improve the model (additional parameters do not remain significant).  
+We plot the data points `(lstat,medv)` along with the linear (blue curve) and polynomial of degree 5 (red curve) fits below.
+```{r}
+summary(model13)
+modelpoly2 <- lm(medv~poly(lstat,2,raw=TRUE), data = boston)
+summary(modelpoly2)
+modelpoly3 <- lm(medv~poly(lstat,3,raw=TRUE), data = boston)
+summary(modelpoly3)
+modelpoly4 <- lm(medv~poly(lstat,4,raw=TRUE), data = boston)
+summary(modelpoly4)
+modelpoly5 <- lm(medv~poly(lstat,5,raw=TRUE), data = boston)
+summary(modelpoly5)
+modelpoly6 <- lm(medv~poly(lstat,6,raw=TRUE), data = boston)
+summary(modelpoly6)
+
+boston$pr1 <- predict(model13,newdata=boston)
+boston$pr5 <- predict(modelpoly5,newdata=boston)
+
+ggplot(boston)+geom_point(aes(lstat,medv))+geom_line(aes(lstat,pr1),color="blue",size=2)+geom_line(aes(lstat,pr5),color="red",linetype="solid",size=2)
+```
+
+
+
+
+
+10. Orley Ashenfelter in his paper "**Predicting the Quality and Price of Bordeaux Wines**" published in *The Economic Journal* showed that the variability in the prices of Bordeaux wines is predicted well by the weather that created the grapes. In this question, you will validate how these results translate to a dataset for wines produced in Australia. The data is provided in the file `winedata.csv`. The dataset contains the following variables:  
+* `vintage`: year the wine was made  
+* `price91`: 1991 auction prices for the wine in dollars  
+* `price92`: 1992 auction prices for the wine in dollars  
+* `temp`: Average temperature during the growing season in degree Celsius  
+* `hrain`: total harvest rain in mm  
+* `wrain`: total winter rain in mm  
+* `tempdiff`: sum of the difference between the maximum and minimum temperatures during the growing season in degree Celsius  
+(a) Define two new variables `age91` and `age92` that captures the age of the wine (in years) at the time of the auctions. For example, a 1961 wine would have an age of 30 at the auction in 1991. What is the average price of wines that were 15 years or older at the time of the 1991 auction?  
+*Answer.* The average price of wine that were 15 years or older at the 1991 auction is
+\$96.44.
+
+```{r}
+wine<-read.csv("winedata.csv")
+str(wine)
+wine$age91<-1991-wine$vintage
+wine$age92<-1992-wine$vintage
+mean(subset(wine$price91,wine$age91>=15))
+```
+
+(b) What is the average price of the wines in the 1991 auction that were produced in years when both the harvest rain was below average and the temperature difference was below average?  
+*Answer.* The average price in 1991 when harvest rain and temperature difference were below average is \$72.87.
+
+```{r}
+mean(subset(wine$price91,wine$hrain<mean(wine$hrain)&wine$tempdiff<mean(wine$tempdiff)))
+```
+
+(c) In this question, you will develop a simple linear regression model to fit the log of the price at which the wine was auctioned in 1991 with the age of the wine. To fit the model, use a training set with data for the wines up to (and including) the year 1981. What is the R-squared for this model?  
+*Answer.* $R^2$ for this model is 0.6675.
+
+```{r}
+train<-subset(wine,vintage<=1981)
+model1<-lm(log(price91)~age91,data=train)
+summary(model1)
+```
+
+(d) Find the 99% confidence interval for the estimated coefficients from the regression.  
+*Answer.*   
+ For `intercept` ($\beta_0$): [3.159, 3.98].  
+ For `age`($\beta_1$): [0.022, 0.062].
+
+```{r}
+confint(model1, level = 0.99)
+```
+
+(e) Use the model to predict the log of prices for wines made from 1982 onwards and auctioned in 1991. What is the test R-squared?  
+*Answer.* Test $R^2=0.9213742.$
+
+```{r}
+test<-subset(wine,vintage>=1982)
+predtest<-predict(model1,newdata=test)
+predtest
+log(test$price91)
+
+sse<-sum((log(test$price91)-predtest)^2)
+sst<-sum((log(test$price91)-mean(log(train$price91)))^2)
+sse
+sst
+sst-sse
+
+ssr<-sum((predtest-mean(log(train$price91)))^2)
+
+  ssr  
+  
+testR2<- 1-sse/sst
+testR2
+```
+
+(f) Which among the following options describes best the quality of fit of the model for this dataset in comparison with the Bordeaux wine dataset that was analyzed by Orley Ashenfelter?  
+    + The result indicates that the variation of the prices of the wines in this dataset is explained much less by the age of the wine in comparison to Bordeaux wines.
+    + The result indicates that the variation of the prices of the wines in this dataset is explained much more by the age of the wine in comparison to Bordeaux wines.
+    + The age of the wine has no predictive power on the wine prices in both the datasets.    
+*Answer.* In comparison to the results for the Bordeaux wine data, the training (model)
+$R^2$ and test $R^2$ is higher for this new dataset. This seems to indicate that the variation
+in the prices of the wine in this dataset is explained much more by the age of the wines in
+comparison to the Bordeaux dataset.
+
+    
+(g) Construct a multiple regression model to fit the log of the price at which the wine was auctioned in 1991 with all the possible predictors (`age91, temp, hrain, wrain, tempdiff`) in the training dataset. To fit your model, use the data for wines made up to (and including) the year 1981. What is the R-squared for the model?  
+*Answer.* For this model $R^2=0.7938.$
+
+```{r}
+model2<-lm(log(price91)~temp+hrain+wrain+tempdiff+age91,data=train)
+summary(model2)
+```
+
+(h) Is this model preferred to the model with only the age variable as a predictor (use the adjusted R-squared for the model to decide on this)?  
+*Answer.* With only the age variable, adjusted $R^2=0.65$. On the other hand, with all the variables, adjusted $R^2=0.7145$. This seems to indicate that the latter model (with more variables
+included) is preferred.
+
+
+(i) Which among the following best describes the output from the fitted model?  
+    + The result indicates that lower the temperature, the higher the price and quality of the wine
+    + The result indicates that greater the temperature difference, the higher the price and quality of wine.
+    + The result indicates that lesser the harvest rain, the higher the price and quality of the wine.
+    + The result indicates that winter rain is a very important variable in the fit of the data.  
+*Answer.*  The result indicates that the lesser the harvest rain, the higher the price and the
+quality of the wine will be. This is because the corresponding $\beta=-0.003$ and is significant
+at the 10\% level. All other statements appear to be false.
+
+
+(j) Of the five variables (`age91, temp, hrain, wrain, tempdiff`), drop the two variables that are the least significant from the results in (g). Rerun the linear regression and write down your fitted model.  
+*Answer.* The least significant variables are `wrain` and `tempdiff` with p-values 0.53 and
+0.416 respectively and we create `model3` removing the two.
+
+```{r}
+model3<-lm(log(price91)~temp+hrain+age91,data=train)
+summary(model3)
+```
+
+(k) Is this model preferred to the model with all variables as predictors (use the adjusted R-squared in the training set to decide on this)?  
+*Answer.* In the training set, adjusted $R^2$ for this model is 0.73 while for `model2`, adjsuted $R^2$ is 0.7145. In this case, the new `model3` is preferred to `model2`.
+
+
+(l) Using the variables identified in (j), construct a multiple regression model to fit the log of the price at which the wine was auctioned in 1992 (remember to use `age92` instead of `age91`). To fit your model, use the data for wines made up to (and including) the year 1981. What is the R-squared value for the model?  
+*Answer.* $R^2$ for this model is 0.5834.
+
+```{r}
+model4<-lm(log(price92)~temp+hrain+age92,data=train)
+summary(model4)
+```
+
+(m) Suppose in this application, we assume that a variable is statistically significant at the 0.2 level. Would you reject the hypothesis that the coefficient for the variable `hrain` is zero?  
+*Answer.* The p-value for hrain is 0.32. Hence we cannot reject the null hypothesis that the coefficient for `hrain` is zero.
+
+
+(n) By separately estimating the equations for the wine prices for each auction, we can better establish the credibility of the explanatory variables because:  
+    + We have more data to fit our models with.
+    + The effect of the weather variables and age of the wine (sign of the estimated coefficients) can be checked for consistency across years.
+    + 1991 and 1992 are the markets when the Australian wines were traded heavily.
+Select the best option.  
+*Answer.* The best explanation seems to be that we can check for consistency of the effect of weather variables and age by looking at the sign of the estimated coefficients.
+
+
+(o) The current fit of the linear regression using the weather variables drops all observations where any of the entries are missing. Provide a short explanation on when this might not be a reasonable approach to use.  
+*Answer.* Clearly, dropping missing entries is reliable. However, if there are many missing
+entries, then this implies we can lose a lot of data.
+
+
+11. 
+
+## (a)
+Q: Each row in the baseball dataset represents a team in a particular year. Read the data into a dataframe called `baseballlarge`.
+
+A: 
+```{r 1_a}
+baseballlarge <- read.csv("baseballlarge.csv")
+# str(baseballlarge)
+
+# while we will be commenting out all str(data.frame) calls
+# it is still advisable to take at least one look at it
+# but it is often not directly relevant to questions
+```
+### i.
+Q: How many team/year pairs are there in the whole dataset?
+
+A: 
+```{r 1_a_i}
+# number of observations equal to number of rows
+nrow(baseballlarge)
+```
+
+There are a total of 1232 team/year pairs in the whole dataset.
+
+### ii.
+Q: Though the dataset contains data from 1962 until 2012, we removed several years with shorter-than-usual seasons. Using the `table()` function, identify the total number of years included in this dataset.
+
+A: 
+```{r 1_a_ii}
+# number of entries can be counted with length()
+length(table(baseballlarge$Year)) 
+
+```
+
+There are a total of 47 years included in the dataset though it ranges from 1962 to 2012.
+
+### iii.
+Q: Since we are only analyzing teams that made the playoffs, use the `subset()` function to create a smaller data frame limited to teams that made the playoffs. Your subsetted data frame should still be called `baseballlarge`. How many team/year pairs are included in the new dataset?
+
+A: 
+```{r 1_a_iii}
+baseballlarge <- subset(baseballlarge, Playoffs == 1)
+nrow(baseballlarge)
+```
+There are a total of 244 team/year pairs in the new dataset.
+
+### iv. 
+Q: Through the years, different numbers of teams have been invited to the playoffs. Find the different number of teams making the playoffs across the seasons.
+
+A: 
+The following code shows the number of teams at the playoffs over the years.
+```{r 1_a_iv1}
+table(baseballlarge$Year)
+```
+The top row is the year, and the bottom row is the number of teams.
+
+
+## (b)
+It is much harder to win the World Series if there are 10 teams competing for the championship versus just two. Therefore, we will add the predictor variable `NumCompetitors` to the data frame. `NumCompetitors` will contain the number of total teams making the playoffs in the year of a particular team/year pair. For instance, `NumCompetitors` should be 2 for the 1962 New York Yankees, but it should be 8 for the 1998 Boston Red Sox. We want to look up the number of teams in the playoffs for each team/year pair in the dataset, and store it as a new variable named `NumCompetitors` in the data frame. Do this. How many playoff team/year pairs are there in the dataset from years where 8 teams were invited to the playoffs?
+
+A:
+```{r 1_b1}
+year_col <- baseballlarge$Year
+
+#the column of Year values, given by as.character(year_col), are taken and mapped to values as found in table(year_col). They are then assigned to a new column NumCompetitors
+baseballlarge$NumCompetitors <- table(year_col)[as.character(year_col)]
+table(baseballlarge$NumCompetitors)
+```
+To retrieve the number directly:
+```{r 1_b2}
+table(baseballlarge$NumCompetitors)["8"]  #this lets us see the value 8, and count 128
+unname(table(baseballlarge$NumCompetitors)["8"]) # with unname(), we can retrieve 128 directly
+```
+There were 128 team/year pairs where 8 teams were invited to the playoffs. (Note that we can also verify this with [iv.](#oneaiv) as 8 * 16 = 128)
+
+## (c)
+Q: In this problem, we seek to predict whether a team won the World Series; in our dataset this is denoted with a `RankPlayoffs` value of 1. Add a variable named `WorldSeries` to the data frame that takes value 1 if a team won the World Series in the indicated year and a 0 otherwise. How many observations do we have in our dataset where a team did NOT win the World Series?
+
+A:
+```{r 1_c1}
+baseballlarge$WorldSeries <- as.integer(baseballlarge$RankPlayoffs == 1) #as.integer converts TRUE to 1 and FALSE to 0
+table(baseballlarge$WorldSeries)
+```
+
+Let's retrieve the value without "0" as the header,
+```{r 1_c2}
+unname(table(baseballlarge$WorldSeries)["0"])
+```
+There are 197 team/year pairs in the dataset who did not win the World Series.
+
+## (d)
+Q: When we are not sure which of our variables are useful in predicting a particular outcome, it is often helpful to build simple models, which are models that predict the outcome using a single independent variable. Which of the variables is a significant predictor of the `WorldSeries` variable in a logistic regression model? To determine significance, remember to look at the stars in the summary output of the model. We'll define an independent variable as significant if there is at least one star at the end of the coefficients row for that variable (this is equivalent to the p-value column having a value smaller than 0.05). Note that you have to build multiple models - with each model having a single independent variable from  (this is equivalent to the probability column having a value smaller than 0.05). Note that you have to build multiple models ( `Year`, `RS`, `RA`, `W`, `OBP`, `SLG`, `BA`, `RankSeason`, `NumCompetitors`, `League`) to answer this question (you can code the `League` variable as a categorical variable). Use the dataframe `baseballlarge` to build the models.
+
+A: 
+First of all we will do this in a simple manner before trying an approach that scales better:
+```{r 1_d1}
+model_1_d <- glm(WorldSeries ~ Year, data = baseballlarge, family = binomial)
+summary(model_1_d)
+```
+As can be seen, a massive output is printed. While IQR, deviance and so on are useful in general, they are not critical to the task as given by the question. Our aim is simply to check the p-value against 0.05.
+
+As a tip, check what named elements a named list has in RStudio by using `$`:
+```{r 1_tip}
+# in this example we will just grab a random element from the summary
+x <- summary(model_1_d)  # to make a short-named new variable
+x$iter # simply type "x$" and wait for RStudio to suggest things
+# number of Newton-Raphson iterations, good to know but not critical
+```
+
+We can take the p-value directly from the `summary(model)` object directly:
+```{r 1_d2}
+# we use [2, 4] as following models will only have 1 variable anyway
+# one can get the p-value column using [,4]
+# 'coefficients' can be shortened to 'coef' i.e. summary(model1)$coef
+# assuming no other elements named 'coef' or similar were added
+summary(model_1_d)$coefficients[2, 4] 
+```
+Scaling up, we write a for-loop to do this for all variables.
+```{r 1_d3}
+# initialise some containers we will add to later
+p_val_1_d <- c() #to save our p-values for later
+model_list_1 <- list()  # to contain all the models later
+all_vars_1 <- c("Year", "RS", "RA", "W", "OBP", "SLG", "BA",
+                "RankSeason", "NumCompetitors", "League")
+
+#to train single-variable models                                                                                           
+for (variable in all_vars_1) {
+
+    model <- glm(as.formula(paste0("WorldSeries ~ ", variable)),
+                 data = baseballlarge, family = binomial)
+    model_list_1[[variable]] <- model #save the trained model in the list
+    # we are appending a named numeric variable, for reference later
+    p_val_1_d <- c(p_val_1_d,
+                   setNames(summary(model)$coefficients[2, 4], variable))  
+}
+p_val_1_d
+```
+We directly get the significance variables at the 5% significance level with the following code:
+```{r 1_d4}
+sig_vars_1_d <- names(p_val_1_d[p_val_1_d < 0.05])
+sig_vars_1_d
+```
+The significant (at the 5% significance level) variables are `Year`, `RA`, `RankSeason` and `NumCompetitors`. However, by manual inspection of the p-values, we can see that `W` and `SLG` are quite close with p-values 0.0577 and 0.0504 respectively which are just a little short of 0.05.
+
+## (e)
+Q: In this question, we will consider multivariate models that combine the variables we found to be significant in (d). Build a model using all of the variables that you found to be significant in (d). How many variables are significant in the combined model?
+
+A: Note that while we will include the variables `Year`, `RA`, `RankSeason` and `NumCompetitors`, it also makes sense to include `W` and `SLG` since they have p-values close to 0.05. 
+
+```{r 1_e1}
+sig_vars_1_e <- c(sig_vars_1_d, "W", "SLG") # add on manually considered W and SLG
+
+# with this we can make the formula without manually typing all the variable names
+# we need 2 paste0() as the sig_vars_1_d  are a vector of characters
+# we need to collapse sig_vars_1_e into string "Year + ... + SLG"
+formula_1 <- as.formula(paste0("WorldSeries ~ ",
+                               paste0(sig_vars_1_e, collapse = "+")))
+model_1_e <- glm(formula_1, data = baseballlarge, family = binomial)
+# p-values
+p_val_1_e <- summary(model_1_e)$coefficients[,4]
+p_val_1_e
+```
+We can check for significance at the 5% significance level quite simply:
+```{r 1_e2}
+names(p_val_1_e[p_val_1_e < 0.05])
+```
+Unfortunately, it seems that in this new multivariate model, none of the variables are significant. You can check that this is the same whether we added `W` and `SLG` or not.
+
+## (f) 
+Q: Often, variables that were significant in single variable models are no longer significant in multivariate analysis due to correlation between the variables. Are there any such variables in this example? Which of the variable pairs have a high degree of correlation (a correlation greater than 0.8 or less than -0.8)?
+
+A: We can run the `cor()` function first:
+```{r 1_f1}
+corr_1 <- cor(baseballlarge[,sig_vars_1_d])
+corr_1
+```
+The answer is already in the above, and we can just read through the non-diagonal terms to check if they are > 0.8. But here, we will show an approach which gets the variable names directly.
+
+```{r 1_f2}
+diag(corr_1) <- 0  # self-correlation not relevant
+row.names(which(corr_1 > 0.8, arr.ind = T))
+# x <- row.names(which(corr_1 > 0.8, arr.ind = T))  # NOT DISPLAYED
+# x
+```
+The variables which are highly correlated are `NumCompetitors` and `Year`.
+
+## (g)
+Q: Build all of the two variable models using variables in (e). You should compare them with the single variable models from (d). Which model has the best AIC value (the minimum AIC value)?
+
+A: We repeat the procedure in [(d)].
+```{r 1_g1}
+model_1_g <- glm(WorldSeries ~ Year + RA,
+                 data = baseballlarge, family = binomial)
+summary(model_1_g)
+```
+A lot of output, but in this part we are interested in the Akaike Information Criterion (AIC). After this, we will simply try to *not* display the raw output of `summary()` again.
+```{r 1_g2}
+summary(model_1_g)$aic  # we can use this to grab AIC directly
+```
+
+Instead of typing all the pairwise combinations of variables, we show an iterative approach below.
+```{r 1_g3}
+var_combns_1 <- combn(sig_vars_1_d, 2)  # combinations of 2 variables
+aic_table_1 <- data.frame(var_1 = character(), var_2 = character(),
+                          aic = numeric())
+
+#iterate through the pariwise combinations of variables
+for (idx in 1:choose(length(sig_vars_1_d), 2)) {
+    var_comb <- var_combns_1[,idx] #get the combination of variables
+
+    model <- glm(formula(paste0("WorldSeries ~ ", paste0(var_comb, collapse = "+"))),
+             data = baseballlarge, family = binomial)
+    # note that rbind is relatively slow but this is not too important
+    aic_table_1 <- rbind(aic_table_1,
+                         data.frame(var1 = var_comb[1],
+                                    var2 = var_comb[2],
+                                    aic = summary(model)$aic))
+
+}
+#iterate through all the original variables (single variables)
+for (model in model_list_1) {
+    aic_table_1 <- rbind(aic_table_1,
+                         data.frame(var1 = names(model$coefficients)[2],
+                                    var2 = NA,  # NULL does not work
+                                    aic = model$aic))
+}
+aic_table_1
+```
+
+As usual, there are a lot of numbers to look through. To simplify things we can just print the row with minimum AIC:
+```{r 1_g4}
+aic_table_1[which.min(aic_table_1[,3]),]
+```
+
+This shows that the model `World Series ~ NumCompetitors` has the best AIC value.
+
+## (h)
+Q: Comment on your results.
+
+A: Disappointingly, and somewhat unsurprisingly, it seems that in the winning of playoffs, the number of competitors is the single best and strongest predictor. The other predictors such as Wins, Runs Scored, Runs Allowed, On-Base Percentage, Slugging Percentage and Batting Average do not seem to be as good (linear) predictors.
+
+```{r 1_end}
+#use this to help you clear your environment :)
+setdiff(ls(), ls(pattern = "SETUP"))
+rm(list = setdiff(ls(), ls(pattern = "SETUP")))
+```
+
+
+12
+
+## (a)
+Q: Load the dataset `Parole.csv` into a data frame called `Parole`. How many parolees are contained in the dataset?
+
+A: 
+```{r 2_a}
+Parole <- read.csv("Parole.csv")
+# str(Parole)
+nrow(Parole)
+```
+There are a total of 675 parolees in this dataset.
+
+## (b)
+Q: How many of the parolees in the dataset violated the terms of their parole?
+
+A: 
+```{r 2_b}
+unname(table(Parole$Violator)[2])  # col of "1" is the second element
+```
+78 of the parolees violated the terms of their parole.
+
+## (c)
+Q: Factor variables are variables that take on a discrete set of values and can be either unordered or ordered. Names of countries indexed by levels is an example of an unordered factor because there isn't any natural ordering between the levels. An ordered factor has a natural ordering between the levels (an example would be the classifications "large", "medium" and "small"). Which variables in this dataset are unordered factors with at least three levels? To deal with unordered factors in a regression model, the standard practice is to define one level as the "reference level" and create a binary variable for each of the remaining levels. In doing so, a factor with *n* levels is replaced by *n*-1 binary variables. We will see this in question [(e)].
+
+A:
+```{r 2_c}
+# We observe that there are 2 columns with factor type, State and Crime
+# NOTE: read.csv automatically converts characters to strings unless 'stringsAsFactors=F' is specified
+sapply(Parole, class)
+
+# If there is a column with character type you wish to convert eg.State, use: Parole$State <- as.factor(Parole$State)
+
+sapply(Parole[sapply(Parole, is.factor)], nlevels) #get the number of levels of each column
+```
+In this data, `State` and `Crime` are unordered factor variables with at least 3 variables (4 each).
+
+## (d)
+Q: To ensure consistent training/testing set splits, run the following 5 lines of code (do not include the line numbers at the beginning):
+
+`(1) > set.seed(144)`\linebreak
+`(2) > library(caTools)`\linebreak
+`(3) > split <- sample.split(Parole$Violator, SplitRatio = 0.7)`\linebreak
+`(4) > train <- subset(Parole, split == TRUE)`\linebreak
+`(5) > test <- subset(Parole, split == FALSE)`
+
+Roughly what proportion of parolees have been allocated to the training and testing sets?
+
+Now, suppose you re-ran lines (1)-(5) again. What would you expect?
+
+* The exact same training/testing set split as the first execution of (1)-(5)
+* A different training/testing set split from the first execution of (1)-(5)
+
+If you instead ONLY re-ran lines (3)-(5), what would you expect?
+
+* The exact same training/testing set split as the first execution of (1)-(5)
+* A different training/testing set split from the first execution of (1)-(5)
+
+If you instead called `set.seed()` with a different number and then re-ran lines (3)-(5), what would you expect?
+
+* The exact same training/testing set split as the first execution of (1)-(5)
+* A different training/testing set split from the first execution of (1)-(5)
+
+A: In the split, roughly 70% of the parolees have been assigned to the training and 30% to the test set. If you rerun the commands (1) - (5), we would expect to get the same training/test split as the first execution, and this is because we set the random seed (used by the random number generator) to be the same. It follows naturally that if we only run commands (3) - (5) without setting a seed, or setting a seed to a different number from 144, we would get a different training/test split.
+
+All of this can be verified fairly easily, although we will use different variable names:
+```{r 2_d1}
+set.seed(144)
+library(caTools)
+s1 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr1 <- subset(Parole, s1 == TRUE)
+te1 <- subset(Parole, s1 == FALSE)
+```
+The second split,
+```{r 2_d2}
+set.seed(144)
+library(caTools)
+s2 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr2 <- subset(Parole, s2 == TRUE)
+te2 <- subset(Parole, s2 == FALSE)
+```
+Now we compare them:
+```{r 2_d3, results = "hold"}
+identical(s1, s2, FALSE, FALSE, FALSE, FALSE)
+identical(tr1, tr2, FALSE, FALSE, FALSE, FALSE)
+identical(te1, te2, FALSE, FALSE, FALSE, FALSE)
+```
+If anything but three `TRUE`s were returned, then something would have been wrong. One may opt to check with some memory-checking functions that the objects above being checked for being the same are actually residing in different parts of the computer's memory.^[See https://stackoverflow.com/a/10913296] (Else if they were the same object in memory, it would make sense they would pass checks of being identical.) Further, running `library(caTools)` is not required other than the first time, and should not affect the splits.
+
+Next we just check without setting the seed:
+```{r 2_d4}
+s3 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr3 <- subset(Parole, s3 == TRUE)
+te3 <- subset(Parole, s3 == FALSE)
+identical(s1, s3, FALSE, FALSE, FALSE, FALSE)
+```
+
+We can check further with a different seed:
+```{r 2_d5}
+set.seed(3) # also equal to  569936821221962380720**3 +
+            #               -569936821113563493509**3 +
+            #               -472715493453327032   **3
+# cannot verify in R without precision of around 210 bits
+s4 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr4 <- subset(Parole, s4 == TRUE)
+te4 <- subset(Parole, s4 == FALSE)
+identical(s1, s4, FALSE, FALSE, FALSE, FALSE)
+```
+
+## (e)
+Q: If you tested other training/testing set splits in the previous section, please re-run the original 5 lines of code to obtain the original split. Using `glm`, train a logistic regression model on the training set. Your dependent variable is `Violator`, and you should use all the other variables as independent variables. What variables are significant in this model? Significant variables should have a least one star, or should have a p-value less than 0.05
+
+A: 
+```{r 2_e1}
+set.seed(144)
+library(caTools)  # not required by this point
+split <- sample.split(Parole$Violator, SplitRatio = 0.7)
+train <- subset(Parole, split == TRUE)
+test <- subset(Parole, split == FALSE)
+# keeping the variable names, although preferably label by question
+```
+
+As before we run the `glm()` function,
+```{r 2_e2}
+model_2 <- glm(Violator ~ ., data = train, family = binomial)
+#summary(model_2)
+```
+But we simply seek to get the significant variables:
+```{r 2_e3}
+coef_table_2 <- summary(model_2)$coefficients #save the coefficients for later use
+p_val_2_e <- coef_table_2[,4]
+sig_vars_2 <- names(p_val_2_e[p_val_2_e <= 0.05])
+sig_vars_2
+```
+
+The significant variables at the 5% significance level are `RaceWhite`, `StateVirginia` and `MultipleOffenses`.
+
+## (f)
+Q: What can we say based on the coefficient of the `MultipleOffenses` variable?
+
+* Our model predicts that parolees who committed multiple offenses have 1.61 times higher odds of being a violator than the average parolee.
+* Our model predicts that a parolee who committed multiple offenses has 1.61 times higher odds of being a violator than a parolee who did not commit multiple offenses but is otherwise identical.
+* Our model predicts that parolees who committed multiple offenses have 5.01 times higher odds of being a violator than the average parolee.
+* Our model predicts that a parolee who committed multiple offenses has 5.01 times higher odds of being a violator than a parolee who did not commit multiple offenses but is otherwise identical.
+
+A: 
+```{r 2_f, results = "hold"}
+# Get the corresponding coefficient of the 'MultipleOffenses' variable (amount of increase in log odds if one comitted multiple offenses)
+# Use row name to extract row (check spelling!); column 1 corresponds to coefficient column
+coef_multiple <- coef_table_2["MultipleOffenses", 1]
+exp(coef_multiple) # odds
+```
+
+The binary variable `MultipleOffenses` takes values 0 if a person did not commit multiple offenses, else 1. The increase in log odds is 1.61*1 = 1.61 if the person commited multiple offenses.
+
+This means that the odds is equal to 5.01, and represents the odds of a parolee to be a violator with multiple offenses, compared to a person who did not commit multiple offenses but is otherwise identical. Statement (4) is the appropriate one.
+
+## (g)
+Q: Consider a parolee who is male, of white race, aged 50 years at prison release, from Kentucky, served 3 months, had a maximum sentence of 12 months, did not commit multiple offenses, and committed a larceny. According to the model, what are the odds this individual is a violator? According to the model, what is the probability this individual is a violator?
+
+A: The log odds of the given individual being a violator is
+```{r 2_g1}
+# Here we prep the coefficients we need
+coef_2 <- coef_table_2 #includes many coefficients we don't need
+
+# We want to remove the coefficients for StateLouisiana, StateOther, StateVirginia, CrimeDrugs, CrimeOther
+coef_2 <- coef_2[!(startsWith(rownames(coef_2), "State")  |
+                   startsWith(rownames(coef_2), "Crime")) |
+                 rownames(coef_2) == "CrimeLarceny",]
+
+# Or we can also choose the variables (rows) we want to keep
+# keep_var <- c("(Intercept)","Male", "RaceWhite", "Age", "TimeServed", "MaxSentence", "MultipleOffenses", "CrimeLarceny")
+# coef_2 <- coef_table_2[keep_var,]
+
+# Note that we retain CrimeLarceny because our prisoner has that
+# Also note that StateKentucky is being used as a reference
+# and hence there is no coefficient
+```
+
+```{r 2_g2}
+# Based on information given, define x_2
+x_2 <- c(1,  # intercept
+         1,  # male
+         1,  # white
+         50, # age
+         3,  # time served
+         12, # max sentence
+         0,  # multiple offenses
+         1)  # larceny
+logodds_2 <- coef_2[,1] %*% x_2  # matrix mult
+#logodds_2
+#exp(logodds_2)
+prob = exp(logodds_2)/ (1+exp(logodds_2))
+prob
+```
+
+The probability that the person with the given attributes is a violator, according to the model is 0.221.
+
+## (h)
+Q: Use the `predict()` function to obtain the model's predicted probabilities for parolees in the test set. What is the maximum predicted probability of a violation?
+
+A: 
+```{r 2_h}
+# Use test data obtained from subsetting in (d)
+pred_2_h <- predict(model_2, newdata = test, type = "response")
+max(pred_2_h)
+```
+
+The maximum predicted probability of violation is 0.907.
+
+## (i)
+Q: In the following questions, evaluate the model's predictions on the test set using a threshold of 0.5. What is the model's sensitivity? What is the model's specificity? What is the model's accuracy?
+
+A: 
+```{r 2_i1}
+pred_table_2 <- table((pred_2_h > 0.5), test$Violator)
+pred_table_2
+```
+The answer lies in the table above. Calculating with R directly:
+```{r 2_i2}
+# sensitivity (true positive rate)
+pred_table_2[2,2]/sum(pred_table_2[,2])
+```
+The Sensitivity (True Positive Rate) is 12/(11+12)=0.521
+
+```{r 2_i3}
+# specificity (true negative rate)
+pred_table_2[1,1]/sum(pred_table_2[,1])
+```
+The Specificity (True Negative Rate) is 167/(167+12)=0.932
+
+```{r 2_i4}
+# accuracy (accuracy)
+sum(diag(pred_table_2)/sum(pred_table_2))
+```
+The Accuracy is (167+12)/(167+11+12+12)=0.886
+
+## (j)
+Q: What is the accuracy of a simple model that predicts that every parolee is a non-violator?
+
+A: 
+```{r 2_j}
+# To predict every parolee as a non-violator, model will have accuracy = total number of non-violators/total number of parolees
+table(test$Violator)[1]/nrow(test)
+# or anything that counts the 0s in the column
+```
+The accuracy of a simple model that predicts that every parolee is a non-violator is 179/202=0.886.
+
+## (k)
+Q: Consider a parole board using the model to predict whether parolees will be violators or not. The job of a parole board is to make sure that a prisoner is ready to be released into free society, and therefore parole boards tend to be particularily concerned with releasing prisoners who will violate their parole. Which of the following most likely describes their preferences and best course of action?
+
+* The board assigns more cost to a false negative than a false positive, and should therefore use a logistic regression cutoff higher than 0.5.
+* The board assigns more cost to a false negative than a false positive, and should therefore use a logistic regression cutoff less than 0.5.
+* The board assigns equal cost to a false positive and a false negative, and should therefore use a logistic regression cutoff equal to 0.5.
+* The board assigns more cost to a false positive than a false negative, and should therefore use a logistic regression cutoff higher than 0.5.
+* The board assigns more cost to a false positive than a false negative, and should therefore use a logistic regression cutoff less than 0.5
+
+A: The answer is the second option. Clearly, in this context, false negatives are a worry where parolees who will be violators are released. Thus, it is natural for the board to assign more cost to false negatives than false positives, and should use a cutoff less than 0.5. Lowering the cutoff makes the model predict more people to be positive, thus reducing this undesirable outcome.
+
+## (l)
+Q: Which of the following is the most accurate assessment of the value of the logistic regression model with a cutoff 0.5 to a parole board, based on the model's accuracy as compared to the simple baseline model?
+
+* The model is of limited value to the board because it cannot outperform a simple baseline, and using a different logistic regression cutoff is unlikely to improve the model's value.
+* The model is of limited value to the board because it cannot outperform a simple baseline, and using a different logistic regression cutoff is likely to improve the model's
+value.
+* The model is likely of value to the board, and using a different logistic regression cutoff is unlikely to improve the model's value.
+* The model is likely of value to the board, and using a different logistic regression cutoff is likely to improve the model's value.
+
+A: The model is of likely value to the board since it can provide a better characterisation than the simple model. While both models have the same accuracy, the baseline model produces many false negatives (23) compared to (11). Changing the threshold is likely to improve the model's value. Thus, the last option is the most accurate assessment.
+
+## (m)
+Q: Using the `ROCR` package, what is the AUC value for the model?
+
+A: 
+```{r 2_m}
+suppressMessages(library(ROCR))  # suppressMessages not critical - this is used as loading this library prints dependencies loaded
+
+# Make a prediction and find the model performance using predicted values
+predrocr_2 <- prediction(pred_2_h, test$Violator)
+auc_2 <- performance(predrocr_2, measure = "auc")@y.values[[1]]
+auc_2 # AUC value (area under curve) - the closer to 1, the better
+```
+
+The AUC value for the model is 0.895.
+
+## (n)
+Q: Describe the meaning of AUC in this context.
+
+* The probability the model can correctly differentiate between a randomly selected parole violator and a randomly selected parole non-violator.
+* The model's accuracy at logistic regression cutoff of 0.5.
+* The model's accuracy at the logistic regression cutoff at which it is most accurate.
+
+A: The AUC can be interpreted as the probability that the model can correctly differentate between a randomly-selected parole violator, and a randomly-selected parole non-violator.
+
+## (o)
+Q: Our goal has been to predict the outcome of a parole decision, and we used a publicly available dataset of parole releases for predictions. In this final problem, we will evaluate a potential source of bias associated with our analysis. It is always important to evaluate a dataset for possible sources of bias. The dataset contains all individuals released from parole in 2004, either due to completing their parole term or violating the terms of their parole. However, it does not contain parolees who neither violated their parole nor completed their term in 2004, causing non-violators to be underrepresented. This is called "selection bias" or "selecting on the dependent variable," because only a subset of all relevant parolees were included in our analysis, based on our dependent variable in this analysis (parole violation). How could we improve our dataset to best address selection bias?
+
+* There is no way to address this form of biasing.
+* We should use the current dataset, expanded to include the missing parolees. Each added parolee should be labeled with Violator=0, because they have not yet had a violation.
+* We should use the current dataset, expanded to include the missing parolees. Each added parolee should be labeled with Violator=NA, because the true outcome has not been observed for these individuals.
+* We should use a dataset tracking a group of parolees from the start of their parole until either they violated parole or they completed their term
+
+A: Option 2 does not capture the true outcome of parolees since they are still either in jail, or not violated thus far. Option 3 does not help us to build a better model. Option 4 is the best, where they are tracked until they violate the parole or complete the term. However, such a dataset requires more effort to gather.
+
+```{r 2_end}
+setdiff(ls(), ls(pattern = "SETUP"))
+rm(list = setdiff(ls(), ls(pattern = "SETUP")))
+```
+
+
+
+
+##### End of Exercise
