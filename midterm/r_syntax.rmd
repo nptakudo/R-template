@@ -1,0 +1,333 @@
+---
+title: "The Ultimate Midterm Cheatsheet (Final Corrected Edition)"
+author: "Statistical Learning in Data Science"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: journal
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+This document is the definitive, exhaustive reference guide. It integrates every unique code command, theoretical concept, and interpretation from all provided lab notebooks and assignments ("Challenger," "Framingham," "Wine," "Auto," "Oscars," Assignment 2, and Midterm Exam).
+
+# 1. Core R Workflow & Data Handling
+
+## 1.1 Setup & Data Loading
+
+**Clear Workspace & Load Libraries**
+
+```{r}
+? linearizeMlist
+```
+
+```{r setup_libs}
+rm(list=ls())
+library(ggplot2)
+library(caTools)
+library(ROCR)
+library(leaps)
+library(MASS)
+library(psych)   # For pairs.panels()
+library(klaR)    # For partimat()
+library(mlogit)  # For multinomial logistic regression
+library(ggfortify) # For autoplot()
+
+
+
+a <- read.csv("similar_terms.csv")
+```
+
+**Load Data from CSV**
+
+```{r load_data, eval=FALSE}
+# Replace "file.csv" with the actual filename
+my_data <- read.csv("file.csv") 
+UScrime <- read.csv("UScrime.csv")
+songs <- read.csv("songs.csv")
+```
+
+## 1.2 Data Inspection
+
+**Essential First Steps for any Dataset**
+
+```{r inspect_data, eval=FALSE}
+str(my_data)      # View data types (chr, int, num), dimensions, and first few values
+summary(my_data)  # Get statistical summary for each variable
+table(my_data$variable) # Get frequency counts for a discrete variable
+head(my_data)     # View the first few rows of the dataframe
+colnames(my_data) # List all column names as a character vector
+length(unique(my_data$ID)) # Count unique values, e.g., to find number of participants
+```
+
+-   **Assignment Task:** Use `which.min()` and `which.max()` to find the row index of min/max values.
+
+```{r min_max_index, eval=FALSE}
+# Find the state with the highest crime rate
+UScrime$States[which.max(UScrime$Crime)]
+```
+
+## 1.3 Data Cleaning & Transformation
+
+**Subset/Filter Data**
+
+```{r subset_data, eval=FALSE}
+# Based on a single or multiple logical conditions
+SongsTrain <- subset(songs, year <= 2008)
+framing1 <- subset(framing, PERIOD==1 & PREVCHD==0)
+winetrain <- subset(wine, VINT <= 1978 & !is.na(LPRICE))
+
+# By row index
+UStrain <- UScrime[1:42, ]
+```
+
+**Remove Columns**
+
+```{r remove_cols, eval=FALSE}
+# By name (simple case)
+UStrain <- subset(UScrime, select = -States)
+
+# Using a vector of names to exclude (more flexible)
+nonvars <- c("year", "songtitle", "artistID")
+SongsTrain <- SongsTrain[, !(names(SongsTrain) %in% nonvars)]
+```
+
+**Create New Variables (Feature Engineering)**
+
+```{r create_vars, eval=FALSE}
+# Binary outcome from a condition
+framing1$TENCHD <- as.integer((framing1$TIMECHD / 365) <= 10)
+songs$WorldSeries <- ifelse(songs$RankPlayoffs == 1, 1, 0)
+
+# Create a polynomial term for non-linear models
+auto$horse2 <- auto$horsepower^2
+
+# Combine variables
+oscarsPP$GG <- oscarsPP$Gmc + oscarsPP$Gdr
+```
+
+**Data Type Conversion (CRITICAL)** \* This specific pattern is required when a column that should be numeric (like `horsepower`) is read as a character or factor because of non-numeric entries (e.g., "?").
+
+```{r convert_type, eval=FALSE}
+auto$horsepower <- as.numeric(as.character(auto$horsepower))
+# The warning "NAs introduced by coercion" is expected and confirms it worked.
+```
+
+**Handle Missing Values**
+
+```{r handle_nas, eval=FALSE}
+sum(is.na(my_data))             # Count total NAs in the dataframe
+my_data_clean <- na.omit(my_data) # Remove all rows that contain any NAs
+# The 'use="complete.obs"' argument is vital for correlation with missing data
+cor(my_data, use="complete.obs")
+```
+
+**Aggregate Data** \* `tapply()` is the key function for calculating summary statistics for different groups.
+
+```{r aggregate_data, eval=FALSE}
+# Example: Find mean crime rate for Southern vs. non-Southern states
+tapply(UScrime$Crime, UScrime$So, mean)
+# Example: Count number of failed o-rings per flight
+tapply(orings$Field, orings$Flight, sum)
+```
+
+# 2. Hypothesis Testing & Visualization
+
+**Two-Sample T-Test** \* **H₀:** The means of the two groups are equal. A small p-value (\< 0.05) means you reject H₀ and conclude there is a statistically significant difference. \* The `alternative` argument is key for one-sided tests.
+
+```{r t_test, eval=FALSE}
+t.test(group1_vector, group2_vector, alternative="greater")
+```
+
+**Correlation & Scatter Plot Matrices** \* `cor()` measures linear association. High correlation (\> 0.8 or \< -0.8) indicates **multicollinearity**, which can destabilize multiple regression model coefficients. \* `pairs.panels()` from the `psych` package is a powerful EDA tool.
+
+```{r corr_plot, eval=FALSE}
+cor(my_data$var1, my_data$var2)
+library(psych)
+pairs.panels(my_data, ellipses=F, lm=T)
+```
+
+**Advanced Visualization (`ggplot2`)** \* `geom_smooth(method="lm")` adds a linear regression line. \* `geom_jitter()` handles overplotting for discrete variables.
+
+```{r viz_advanced, eval=FALSE}
+# Scatter Plot with Regression Line
+ggplot(data, aes(x=var1, y=var2)) + geom_point() + geom_smooth(method="lm")
+
+# Jitter Plot for Binary Outcome
+ggplot(orings, aes(x=Temp, y=Field)) + geom_jitter(height=0.05, width=2)
+```
+
+# 3. Model Fitting
+
+**Linear Regression (`lm`)**
+
+-   **Simple Linear Regression**
+
+```{r lm_simple, eval=FALSE}
+model <- lm(outcome ~ predictor, data=train)
+```
+
+-   **Multiple Linear Regression (Specific Predictors)**
+
+```{r lm_multi_specific, eval=FALSE}
+model <- lm(outcome ~ pred1 + pred2, data=train)
+```
+
+-   **Multiple Linear Regression (All Predictors)**
+
+    -   The `.` syntax uses all other variables in the dataframe as predictors.
+
+    ```{r lm_multi_all, eval=FALSE}
+    model <- lm(outcome ~ ., data=train)
+    ```
+
+-   **Polynomial Regression**
+
+    -   The `I()` function ("as-is") is needed to perform calculations like powers inside the model formula.
+
+    ```{r lm_poly, eval=FALSE}
+    model <- lm(outcome ~ predictor + I(predictor^2), data=train)
+    ```
+
+**Logistic & Probit Regression (`glm`)** \* The `family="binomial"` argument is essential for these models.
+
+```{r glm_models, eval=FALSE}
+# Logistic Regression
+model_log <- glm(outcome ~ ., data=train, family="binomial")
+
+# Probit Regression
+model_probit <- glm(outcome ~ ., data=train, family=binomial(link="probit"))
+```
+
+**LDA & QDA (`MASS` library)** \* Linear and Quadratic Discriminant Analysis are alternatives to logistic regression.
+
+```{r lda_qda_models, eval=FALSE}
+library(MASS)
+model_lda <- lda(outcome ~ pred1 + pred2, data=train)
+model_qda <- qda(outcome ~ pred1 + pred2, data=train)
+```
+
+**Best Subset & Stepwise Selection (`leaps` library)** \* Used for variable selection in **linear regression** to find the best model based on a chosen criterion.
+
+```{r subset_selection, eval=FALSE}
+library(leaps)
+# Best Subset Selection (searches all combinations)
+models_best <- regsubsets(outcome ~ ., data=train, nvmax=10)
+
+# Forward Stepwise Selection (faster, adds one variable at a time)
+models_fwd <- regsubsets(outcome ~ ., data=train, method="forward", nvmax=10)
+```
+
+**Multinomial Logistic Regression (`mlogit` library)** \* For outcomes with \>2 unordered categories. Requires a specific data shape.
+
+```{r mlogit_model, eval=FALSE}
+library(mlogit)
+# 1. Reshape data to "long" format
+data_mlogit <- mlogit.data(data, choice="outcome_var", shape="long", alt.var="choiceID")
+# 2. Fit model (often with -1 to remove intercept)
+model_mlogit <- mlogit(outcome_var ~ pred1 + pred2 - 1, data=data_mlogit)
+```
+
+# 4. Prediction & Model Validation
+
+**Train/Test Split (Reproducible)** \* **`set.seed()` is CRITICAL** for getting the same "random" split every time. This is a key concept for assignment grading.
+
+```{r train_test_split, eval=FALSE}
+set.seed(144)
+split <- sample.split(data$outcome, SplitRatio = 0.7)
+train <- subset(data, split == TRUE)
+test <- subset(data, split == FALSE)
+```
+
+**Generating Predictions (`predict`)**
+
+```{r predictions, eval=FALSE}
+# Linear Model: returns predicted values
+predict(lm_model, newdata=test)
+# Linear Model: 99% confidence interval for the mean prediction
+predict(lm_model, newdata=test, interval="confidence", level=0.99)
+# Linear Model: 99% prediction interval for a single new observation (always wider)
+predict(lm_model, newdata=test, interval="prediction", level=0.99)
+
+# Logistic/Probit Model: type="response" is ESSENTIAL to get probabilities (0-1)
+predict(glm_model, newdata=test, type="response")
+
+# LDA/QDA Model: returns a list
+pred_lda <- predict(lda_model, newdata=test)
+lda_classes <- pred_lda$class
+lda_probs <- pred_lda$posterior
+```
+
+**Confusion Matrix & Key Metrics**
+
+```{r conf_matrix_metrics, eval=FALSE}
+# 1. Get predicted probabilities
+predictions <- predict(glm_model, newdata=test, type="response")
+# 2. Convert probabilities to classes (0 or 1) using a threshold
+predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+# 3. Create the table
+conf_matrix <- table(Actual = test$outcome, Predicted = predicted_classes)
+#           Predicted
+# Actual    0  1
+#      0   TN FP
+#      1   FN TP
+
+# 4. Calculate Metrics
+Accuracy    <- (conf_matrix[1,1] + conf_matrix[2,2]) / sum(conf_matrix)
+Sensitivity <- conf_matrix[2,2] / (conf_matrix[2,1] + conf_matrix[2,2]) # TP / (FN+TP)
+Specificity <- conf_matrix[1,1] / (conf_matrix[1,1] + conf_matrix[1,2]) # TN / (TN+FP)
+
+# Baseline Accuracy: Must beat this for model to be useful
+baseline_accuracy <- table(test$outcome)[1] / nrow(test) # Assumes 0 is majority class
+```
+
+**Test Set SSE & R² (for Linear Models)** \* **CRITICAL RULE:** `sst` (Total Sum of Squares) for the test set *must* be calculated using the mean of the **training set's** outcome. A negative Test R² is possible and means the model is worse than a simple horizontal line at the training mean.
+
+```{r test_r2, eval=FALSE}
+predictions_lm <- predict(lm_model, newdata=test)
+sse <- sum((predictions_lm - test$outcome)^2)
+sst <- sum((test$outcome - mean(train$outcome))^2)
+test_R2 <- 1 - sse / sst
+```
+
+**ROC Curve & AUC (`ROCR` library)** \* AUC measures the model's ability to discriminate between classes. 0.5 is random chance, 1.0 is a perfect classifier.
+
+```{r roc_auc, eval=FALSE}
+library(ROCR)
+# 'probs' are the predicted probabilities from a logistic model
+predObj <- prediction(probs, test$outcome)
+# Calculate performance object for plotting
+perfObj <- performance(predObj, measure="tpr", x.measure="fpr")
+plot(perfObj, colorize=TRUE)
+# Calculate AUC value
+auc <- performance(predObj, measure="auc")@y.values[[1]]
+```
+
+# 5. Model Selection & Diagnostics
+
+**Model Selection Criteria** \* **Adjusted R²:** (`summary(lm_model)$adj.r.squared` or `summary(regsubsets_obj)$adjr2`). **Higher is better.** For comparing `lm` models. \* **AIC (Akaike Info Criterion):** (`glm_model$aic`). **Lower is better.** For comparing `glm` models. \* **BIC (Bayesian Info Criterion):** (`summary(regsubsets_obj)$bic`). **Lower is better.** For `regsubsets`. Penalizes complexity more than AIC. \* **Test Set SSE:** `sum((predictions - actuals)^2)`. **Lower is better.** The ultimate tie-breaker and measure of out-of-sample performance.
+
+**Finding the Best Model with `regsubsets`**
+
+```{r regsubsets_best, eval=FALSE}
+summary_subsets <- summary(models_best)
+# Find model size with best Adj R^2
+which.max(summary_subsets$adjr2)
+# Find model size with best BIC
+which.min(summary_subsets$bic)
+```
+
+**Formal Model Comparison (F-test for Nested Linear Models)** \* Use `anova(model_simple, model_complex)`. If p-value (`Pr(>F)`) is small (\< 0.05), the complex model is a statistically significant improvement.
+
+```{r anova_test, eval=FALSE}
+# Example: Is a quadratic model better than a linear one?
+linear_model <- lm(mpg ~ horsepower, data=auto)
+quad_model <- lm(mpg ~ horsepower + I(horsepower^2), data=auto)
+anova(linear_model, quad_model)
+```
+
+------------------------------------------------------------------------
