@@ -84,6 +84,10 @@ winetrain <- subset(wine, VINT <= 1978 & !is.na(LPRICE))
 
 # By row index
 UStrain <- UScrime[1:42, ]
+
+# Find specific observations
+which(data$variable == "target_value")
+data[155, ]  # Access specific row
 ```
 
 **Remove Columns**
@@ -109,6 +113,14 @@ auto$horse2 <- auto$horsepower^2
 
 # Combine variables
 oscarsPP$GG <- oscarsPP$Gmc + oscarsPP$Gdr
+
+# Log transformations (common in economics/finance)
+data$log_price <- log(data$price)
+data$log_salary <- log(data$salary)
+
+# Exponential back-transformations
+data$price_pred <- exp(data$log_price_pred)
+data$salary_pred <- exp(data$log_salary_pred)
 ```
 
 **Data Type Conversion (CRITICAL)** \* This specific pattern is required when a column that should be numeric (like `horsepower`) is read as a character or factor because of non-numeric entries (e.g., "?").
@@ -123,6 +135,12 @@ auto$horsepower <- as.numeric(as.character(auto$horsepower))
 ```{r handle_nas, eval=FALSE}
 sum(is.na(my_data))             # Count total NAs in the dataframe
 my_data_clean <- na.omit(my_data) # Remove all rows that contain any NAs
+
+# Check for missing data
+sum(is.na(my_data))
+# Remove rows with missing data for correlation
+data_clean <- subset(my_data, !is.na(my_data$var1) & !is.na(my_data$var2))
+
 # The 'use="complete.obs"' argument is vital for correlation with missing data
 cor(my_data, use="complete.obs")
 ```
@@ -134,9 +152,28 @@ cor(my_data, use="complete.obs")
 tapply(UScrime$Crime, UScrime$So, mean)
 # Example: Count number of failed o-rings per flight
 tapply(orings$Field, orings$Flight, sum)
+
+# Count occurrences of each aggregated value
+table(tapply(orings$Field, orings$Flight, sum))
+
+# Multiple grouping variables
+tapply(data$outcome, list(data$group1, data$group2), mean)
 ```
 
 # 2. Hypothesis Testing & Visualization
+
+**One-Sample T-Test** \* Tests whether the mean of a single group equals a specified value. \* Returns confidence intervals for the population mean.
+
+```{r one_sample_t_test, eval=FALSE}
+# Test if mean equals specific value
+t.test(data_vector, mu=target_value)
+
+# Get 99% confidence interval
+t.test(data_vector, mu=target_value, conf.level=0.99)
+
+# Example: Test if waiting time mean equals 71
+t.test(faithful$waiting, mu=71)
+```
 
 **Two-Sample T-Test** \* **H₀:** The means of the two groups are equal. A small p-value (\< 0.05) means you reject H₀ and conclude there is a statistically significant difference. \* The `alternative` argument is key for one-sided tests.
 
@@ -152,6 +189,28 @@ cor(my_data$var1, my_data$var2)
 cor(baseballlarge[,sig_vars_1_d])
 library(psych)
 pairs.panels(my_data, ellipses=F, lm=T)
+
+# Full correlation matrix
+cor(my_data)
+
+# Correlation with missing data handling
+cor(my_data$var1, my_data$var2, use="pairwise.complete.obs")
+cor(my_data, use="complete.obs")  # Excludes rows with any NA
+cor(my_data, use="complete")      # Same as above
+```
+
+**Detecting and Handling Multicollinearity** \* Perfect correlation (r = ±1) causes R to return `NA` coefficients. \* High correlations (\> 0.8) can make coefficients unstable.
+
+```{r multicollinearity, eval=FALSE}
+# Check correlation matrix for problematic pairs
+cor(train_data)
+
+# Fit model with all variables - R will drop perfectly correlated ones
+model_all <- lm(outcome ~ ., data=train_data)
+summary(model_all)  # Look for NA coefficients
+
+# Drop problematic variables manually
+model_clean <- lm(outcome ~ var1 + var2 + var3, data=train_data)
 ```
 
 ### Formal Model Comparison (F-test for Nested Linear Models)
@@ -174,7 +233,7 @@ anova(linear_model, quad_model) # Check the Pr(>F) column in the output
 # Scatter Plot with Regression Line
 ggplot(data, aes(x=var1, y=var2)) + geom_point() + geom_smooth(method="lm")
 
-# Jitter Plot for Binary Outcome
+# Jitter Plot for Binary Outcome (handles overplotting)
 ggplot(orings, aes(x=Temp, y=Field)) + geom_jitter(height=0.05, width=2)
 ```
 
@@ -384,6 +443,39 @@ library(leaps)
 models_best <- regsubsets(outcome ~ ., data=train, nvmax=NULL)
 
 # Forward Stepwise Selection (faster, adds one variable at a time)
+models_fwd <- regsubsets(outcome ~ ., data=train, method="forward", nvmax=10)
+
+# Exhaustive search
+models_exhaustive <- regsubsets(outcome ~ var1 + var2 + var3 + var4, 
+                               data=train, method="exhaustive")
+```
+
+**Automated Stepwise Selection (`MASS` library)** \* `stepAIC()` automatically performs stepwise selection based on AIC.
+
+```{r stepwise_selection, eval=FALSE}
+library(MASS)
+# Fit initial model with all variables
+full_model <- lm(outcome ~ var1 + var2 + var3 + var4, data=train)
+
+# Automated stepwise selection
+best_model <- stepAIC(full_model)
+```
+
+**Model Selection Analysis** \* Extract and compare different selection criteria.
+
+```{r model_selection_analysis, eval=FALSE}
+# Get summary of regsubsets results
+summary_subsets <- summary(models_best)
+
+# View different criteria
+summary_subsets$cp        # Mallow's CP (lower is better)
+summary_subsets$adjr2     # Adjusted R-squared (higher is better)
+summary_subsets$bic       # BIC (lower is better)
+
+# Find best model by CP
+which.min(summary_subsets$cp)
+# Find best model by adjusted R-squared
+which.max(summary_subsets$adjr2)
 models_fwd <- regsubsets(outcome ~ ., data=train, method="forward", nvmax=NULL)
 ```
 
@@ -436,9 +528,17 @@ predict(lm_model, newdata=test)
 predict(lm_model, newdata=test, interval="confidence", level=0.99)
 # Linear Model: 99% prediction interval for a single new observation (always wider)
 predict(lm_model, newdata=test, interval="prediction", level=0.99)
+# Linear Model: Confidence interval for the MEAN prediction (narrower)
+predict(lm_model, newdata=data.frame(var=98), interval="confidence", level=0.95)
+
+# Linear Model: Prediction interval for a SINGLE new observation (wider)
+predict(lm_model, newdata=data.frame(var=98), interval="prediction", level=0.95)
 
 # Logistic/Probit Model: type="response" is ESSENTIAL to get probabilities (0-1)
 predict(glm_model, newdata=test, type="response")
+
+# Logistic Model: Predict on log-odds scale (default)
+predict(glm_model, newdata=test)
 
 # LDA/QDA Model: returns a list
 pred_lda <- predict(lda_model, newdata=test)
@@ -469,6 +569,27 @@ Specificity <- conf_matrix[1,1] / (conf_matrix[1,1] + conf_matrix[1,2]) # TN / (
 baseline_accuracy <- table(test$outcome)[1] / nrow(test) # Assumes 0 is majority class
 ```
 
+**Threshold Analysis** \* Compare performance at different classification thresholds.
+
+```{r threshold_analysis, eval=FALSE}
+# Get predicted probabilities
+pred_probs <- predict(glm_model, newdata=test, type="response")
+
+# Create confusion matrices for different thresholds
+conf_0.5 <- table(pred_probs > 0.5, test$outcome)
+conf_0.25 <- table(pred_probs > 0.25, test$outcome)
+conf_0.2 <- table(pred_probs > 0.2, test$outcome)
+
+# Calculate metrics for each threshold
+# For threshold 0.5
+acc_0.5 <- (conf_0.5[1,1] + conf_0.5[2,2]) / sum(conf_0.5)
+sens_0.5 <- conf_0.5[2,2] / sum(conf_0.5[,2])
+spec_0.5 <- conf_0.5[1,1] / sum(conf_0.5[,1])
+
+# For threshold 0.25
+acc_0.25 <- (conf_0.25[1,1] + conf_0.25[2,2]) / sum(conf_0.25)
+sens_0.25 <- conf_0.25[2,2] / sum(conf_0.25[,2])
+spec_0.25 <- conf_0.25[1,1] / sum(conf_0.25[,1])
 **Mean/Average Sum of squared error (MSE)**
 
 ```{r}
@@ -543,6 +664,147 @@ summary_subsets <- summary(models_best)
 which.max(summary_subsets$adjr2)
 # Find model size with best BIC
 which.min(summary_subsets$bic)
+```
+
+**Model Diagnostics** \* Use `autoplot()` from `ggfortify` package for publication-ready diagnostic plots. \* `plot()` provides basic diagnostic plots.
+
+```{r model_diagnostics, eval=FALSE}
+library(ggfortify)
+
+# Publication-ready diagnostic plots
+autoplot(lm_model)
+
+# Basic diagnostic plots
+plot(lm_model)
+```
+
+**Confidence Intervals for Coefficients** \* `confint()` provides confidence intervals for model coefficients.
+
+```{r confidence_intervals, eval=FALSE}
+# 95% confidence intervals (default)
+confint(lm_model)
+
+# 99% confidence intervals
+confint(lm_model, level=0.99)
+
+# Access coefficients directly
+lm_model$coefficients
+```
+
+**Manual R-squared Calculation** \* Sometimes useful to verify R-squared calculations manually.
+
+```{r manual_r2, eval=FALSE}
+# Get residuals and calculate SSE
+residuals <- lm_model$residuals
+sse <- sum(residuals^2)
+
+# Calculate SST using training data mean
+sst <- sum((train_data$outcome - mean(train_data$outcome))^2)
+
+# Calculate R-squared
+R2 <- 1 - sse/sst
+R2
+```
+
+**Manual Coefficient Calculation** \* Calculate regression coefficients using matrix operations: $\hat{\beta} = (X'X)^{-1}X'Y$
+
+```{r manual_coefficients, eval=FALSE}
+# Create design matrix X (with intercept)
+X <- matrix(c(rep(1, nrow(data)), data$var1, data$var2), ncol=3)
+Y <- data$outcome
+
+# Calculate coefficients manually
+coefficients <- solve(t(X) %*% X) %*% t(X) %*% Y
+coefficients
+
+# Verify with lm()
+model <- lm(outcome ~ var1 + var2, data=data)
+model$coefficients
+```
+
+**Manual Predictions** \* Use coefficients for manual predictions and optimization.
+
+```{r manual_predictions, eval=FALSE}
+# Get model coefficients
+coeffs <- lm_model$coefficients
+
+# Manual prediction for specific values
+prediction <- coeffs[1] + coeffs[2]*0.339 + coeffs[3]*0.43
+prediction
+
+# Matrix multiplication for multiple predictions
+values <- c(1, 0.339, 0.43)  # Include intercept
+prediction_matrix <- sum(coeffs * values)
+prediction_matrix
+
+# Optimization example: player selection
+player_matrix <- matrix(c(0.338, 0.391, 0.369, 0.540, 0.450, 0.374), nrow=3)
+scores <- player_matrix %*% coeffs[2:3]  # Exclude intercept
+scores
+```
+
+**Systematic Model Comparison** \* Compare multiple models systematically using different criteria.
+
+```{r model_comparison, eval=FALSE}
+# Fit multiple models
+model1 <- lm(outcome ~ var1, data=train)
+model2 <- lm(outcome ~ var1 + var2, data=train)
+model3 <- lm(outcome ~ var1 + var2 + var3, data=train)
+
+# Compare R-squared values
+summary(model1)$r.squared
+summary(model2)$r.squared
+summary(model3)$r.squared
+
+# Compare Adjusted R-squared values
+summary(model1)$adj.r.squared
+summary(model2)$adj.r.squared
+summary(model3)$adj.r.squared
+
+# Compare test set performance
+pred1 <- predict(model1, newdata=test)
+pred2 <- predict(model2, newdata=test)
+pred3 <- predict(model3, newdata=test)
+
+# Calculate test R-squared for each
+sst <- sum((test$outcome - mean(train$outcome))^2)
+test_r2_1 <- 1 - sum((pred1 - test$outcome)^2) / sst
+test_r2_2 <- 1 - sum((pred2 - test$outcome)^2) / sst
+test_r2_3 <- 1 - sum((pred3 - test$outcome)^2) / sst
+```
+
+**Manual F-test Calculation** \* Test if additional variables significantly improve the model.
+
+```{r manual_f_test, eval=FALSE}
+# Fit full and reduced models
+full_model <- lm(outcome ~ var1 + var2 + var3 + var4, data=train)
+reduced_model <- lm(outcome ~ var1 + var2, data=train)
+
+# Calculate F-statistic manually
+SSE_full <- sum(full_model$residuals^2)
+SSE_reduced <- sum(reduced_model$residuals^2)
+
+n <- nrow(train)
+p_full <- length(full_model$coefficients) - 1
+q <- p_full - (length(reduced_model$coefficients) - 1)  # Number of extra variables
+
+F_stat <- ((SSE_reduced - SSE_full) / q) / (SSE_full / (n - p_full - 1))
+p_value <- pf(F_stat, q, n - p_full - 1, lower.tail = FALSE)
+
+F_stat
+p_value
+```
+
+**Manual MSE Calculation** \* Calculate Mean Squared Error for model comparison.
+
+```{r manual_mse, eval=FALSE}
+# Fit models
+model1 <- lm(outcome ~ var1, data=train)
+model2 <- lm(outcome ~ var1 + var2, data=train)
+
+# Calculate MSE for each model
+MSE1 <- mean((train$outcome - predict(model1))^2)
+MSE2 <- mean((train$outcome - predict(model2))^2)
 ```
 
 **Formal Model Comparison (F-test for Nested Linear Models)** \* Use `anova(model_simple, model_complex)`. If p-value (`Pr(>F)`) is small (\< 0.05), the complex model is a statistically significant improvement.
