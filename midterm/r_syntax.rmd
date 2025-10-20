@@ -13,8 +13,6 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
-This document is the definitive, exhaustive reference guide. It integrates every unique code command, theoretical concept, and interpretation from all provided lab notebooks and assignments ("Challenger," "Framingham," "Wine," "Auto," "Oscars," Assignment 2, and Midterm Exam).
-
 # 1. Core R Workflow & Data Handling
 
 ## 1.1 Setup & Data Loading
@@ -26,6 +24,7 @@ This document is the definitive, exhaustive reference guide. It integrates every
 ```
 
 ```{r setup_libs}
+
 rm(list=ls())
 library(ggplot2)
 library(caTools)
@@ -39,7 +38,7 @@ library(ggfortify) # For autoplot()
 
 
 
-a <- read.csv("similar_terms.csv")
+a <- read.csv("your_file_name.csv")
 ```
 
 **Load Data from CSV**
@@ -62,6 +61,8 @@ table(my_data$variable) # Get frequency counts for a discrete variable
 head(my_data)     # View the first few rows of the dataframe
 colnames(my_data) # List all column names as a character vector
 length(unique(my_data$ID)) # Count unique values, e.g., to find number of participants
+
+#nrow?
 ```
 
 -   **Assignment Task:** Use `which.min()` and `which.max()` to find the row index of min/max values.
@@ -184,6 +185,8 @@ t.test(group1_vector, group2_vector, alternative="greater")
 
 ```{r corr_plot, eval=FALSE}
 cor(my_data$var1, my_data$var2)
+# between different variable in dataset
+cor(baseballlarge[,sig_vars_1_d])
 library(psych)
 pairs.panels(my_data, ellipses=F, lm=T)
 
@@ -210,6 +213,20 @@ summary(model_all)  # Look for NA coefficients
 model_clean <- lm(outcome ~ var1 + var2 + var3, data=train_data)
 ```
 
+### Formal Model Comparison (F-test for Nested Linear Models)
+
+```{r}
+# Use anova(model_simple, model_complex) to test if the more complex model
+# is a statistically significant improvement over the simpler (nested) model.
+# H₀: The additional coefficients in the complex model are all zero.
+# A small p-value (< 0.05) means you REJECT H₀ and prefer the complex model.
+
+# Example: Is a quadratic model significantly better than a linear one?
+linear_model <- lm(mpg ~ horsepower, data=auto)
+quad_model <- lm(mpg ~ horsepower + I(horsepower^2), data=auto)
+anova(linear_model, quad_model) # Check the Pr(>F) column in the output
+```
+
 **Advanced Visualization (`ggplot2`)** \* `geom_smooth(method="lm")` adds a linear regression line. \* `geom_jitter()` handles overplotting for discrete variables.
 
 ```{r viz_advanced, eval=FALSE}
@@ -224,6 +241,64 @@ ggplot(orings, aes(x=Temp, y=Field)) + geom_jitter(height=0.05, width=2)
 
 **Linear Regression (`lm`)**
 
+```{r}
+# Loop to every predictors
+sse_list <- c()
+predictors <- colnames(boston)[colnames(boston) != "ur_output"]
+
+for (pred in predictors) {
+  formula <- as.formula(paste("medv ~", pred))
+  model <- lm(formula, data = boston)
+  predictions <- predict(model, newdata = test_boston)
+  sse <- mean((test_boston$medv - predictions)^2)
+  sse_list <- c(sse_list, sse)
+}
+# Loop to every predictors and bla bla
+p_values <- sapply(colnames(boston)[-14], function(var) {
+  model <- lm(as.formula(paste("medv ~", var)), data = boston)
+  summary(model)$coefficients[2, 4]  # p-value of the predictor
+})
+p_values
+min_p_value <- min(p_values)
+min_p_value
+significant_var <- names(p_values)[which.min(p_values)]
+significant_var
+
+```
+
+```{r}
+# Simple Linear Regression
+model_simple <- lm(response ~ predictor, data = train_data)
+
+# Multiple Linear Regression (all predictors)
+model_multi <- lm(response ~ ., data = train_data)
+
+# Polynomial Regression
+model_poly <- lm(response ~ poly(predictor, 2), data = train_data)
+
+# With Interactions
+model_interaction <- lm(response ~ pred1 * pred2, data = train_data)
+
+# Get a point prediction on new data
+predict(model, newdata = test_data)
+
+# Get a 95% confidence interval for the mean response
+predict(model, newdata = test_data, interval = "confidence")
+
+# Get a 95% prediction interval for a single new observation
+predict(model, newdata = test_data, interval = "prediction")
+
+# --- MANUAL Test R-squared Calculation (CRITICAL) ---
+# 1. Predict on the test set
+predictions <- predict(model, newdata = test_data)
+# 2. Calculate SSE on the test set
+sse <- sum((test_data$response - predictions)^2)
+# 3. Calculate SST on the test set USING THE TRAINING MEAN
+sst <- sum((test_data$response - mean(train_data$response))^2)
+# 4. Final Test R-squared
+test_r2 <- 1 - sse/sst
+```
+
 -   **Simple Linear Regression**
 
 ```{r lm_simple, eval=FALSE}
@@ -234,6 +309,20 @@ model <- lm(outcome ~ predictor, data=train)
 
 ```{r lm_multi_specific, eval=FALSE}
 model <- lm(outcome ~ pred1 + pred2, data=train)
+
+# R_squared^2 in data training
+summary(model)$r.squared
+
+confint(model,level = 0.99)
+
+model_summary <- summary(model)
+significant_vars <- rownames(model_summary$coefficients)[which(model_summary$coefficients[,4] < 0.001)]
+cat("Variables significant at 0.001 level:", paste(significant_vars, collapse = ", "), "\n")
+
+# which predictor reject the null hypothesis
+#modelall = fit on all predictors
+attr(modelall$coefficients,
+"names")[modelall$coefficients <= 0.05]
 ```
 
 -   **Multiple Linear Regression (All Predictors)**
@@ -250,9 +339,85 @@ model <- lm(outcome ~ pred1 + pred2, data=train)
 
     ```{r lm_poly, eval=FALSE}
     model <- lm(outcome ~ predictor + I(predictor^2), data=train)
+    modle <- lm(outcome ~ predictor + poly(predictor,2), data=train)
     ```
 
 **Logistic & Probit Regression (`glm`)** \* The `family="binomial"` argument is essential for these models.
+
+```{r}
+# loop through single predictor
+p_val_1_d <- c() #to save our p-values for later
+model_list_1 <- list()  # to contain all the models later
+predictors <- colnames(your_dataset)[colnames(your_dataset) != "output_col_name"]
+# all_vars_1 <- c("Year", "RS", "RA", "W", "OBP", "SLG", "BA",
+#                 "RankSeason", "NumCompetitors", "League")
+
+#to train single-variable models                                                                           
+for (variable in predictors) {
+
+    model <- glm(as.formula(paste0("WorldSeries ~ ", variable)),
+                 data = baseballlarge, family = binomial)
+    model_list_1[[variable]] <- model #save the trained model in the list
+    # we are appending a named numeric variable, for reference later
+    p_val_1_d <- c(p_val_1_d,
+                   setNames(summary(model)$coefficients[2, 4], variable))  
+}
+p_val_1_d
+#find significance level at the 5%
+sig_vars_1_d <- names(p_val_1_d[p_val_1_d < 0.05])
+sig_vars_1_d
+
+
+# find sigfiance level at the 5% of multi predictors
+model_2 <- glm(Violator ~ ., data = train, family = binomial)
+
+coef_table_2 <- summary(model_2)$coefficients #save the coefficients for later use
+p_val_2_e <- coef_table_2[,4]
+sig_vars_2 <- names(p_val_2_e[p_val_2_e <= 0.05])
+sig_vars_2
+
+```
+
+Coefficience & odds
+
+```{r}
+coef_multiple <- coef_table_2["MultipleOffenses", 1]
+exp(coef_multiple) # odds
+```
+
+```{r}
+# Logistic Regression (binary outcome)
+model_log <- glm(outcome ~ ., data = train_data, family = "binomial")
+
+# LDA (Linear Discriminant Analysis)
+library(MASS)
+model_lda <- lda(outcome ~ ., data = train_data)
+
+# QDA (Quadratic Discriminant Analysis)
+model_qda <- qda(outcome ~ ., data = train_data)
+
+library(mlogit)
+
+# --- This is a complex topic from Practice 2.5, Q1 ---
+# 1. Reshape data from "wide" to "long" format.
+# `choice` is the column telling you which option was chosen.
+# `alt.var` is the column that groups the alternative-specific variables.
+Heating_long <- mlogit.data(Heating, choice = "depvar", shape = "wide", 
+                            varying = 3:12, alt.var = "alt")
+
+# 2. Fit the model. `|` separates chooser-specific from alternative-specific variables.
+# Model with alternative-specific costs and chooser-specific income
+model_ml <- mlogit(depvar ~ ic + oc | income, data = Heating_long)
+
+# Model with alternative-specific constants (intercepts for each choice)
+model_asc <- mlogit(depvar ~ ic + oc, data = Heating_long)
+# No intercept
+modelQ1_1 <- mlogit(depvar ~ ic + oc - 1, dataheat)  # -1 means no intercept
+
+
+# Predict shares/probabilities
+predict(model_asc, newdata = Heating_long)
+```
 
 ```{r glm_models, eval=FALSE}
 # Logistic Regression
@@ -275,7 +440,7 @@ model_qda <- qda(outcome ~ pred1 + pred2, data=train)
 ```{r subset_selection, eval=FALSE}
 library(leaps)
 # Best Subset Selection (searches all combinations)
-models_best <- regsubsets(outcome ~ ., data=train, nvmax=10)
+models_best <- regsubsets(outcome ~ ., data=train, nvmax=NULL)
 
 # Forward Stepwise Selection (faster, adds one variable at a time)
 models_fwd <- regsubsets(outcome ~ ., data=train, method="forward", nvmax=10)
@@ -311,6 +476,7 @@ summary_subsets$bic       # BIC (lower is better)
 which.min(summary_subsets$cp)
 # Find best model by adjusted R-squared
 which.max(summary_subsets$adjr2)
+models_fwd <- regsubsets(outcome ~ ., data=train, method="forward", nvmax=NULL)
 ```
 
 **Multinomial Logistic Regression (`mlogit` library)** \* For outcomes with \>2 unordered categories. Requires a specific data shape.
@@ -332,6 +498,25 @@ set.seed(144)
 split <- sample.split(data$outcome, SplitRatio = 0.7)
 train <- subset(data, split == TRUE)
 test <- subset(data, split == FALSE)
+
+
+set.seed(1)
+trainid <- sample(1:nrow(college), 0.8*nrow(college))
+testid <- -trainid
+train <- college[trainid,]
+test <- college[testid,]
+```
+
+**Find average sum on Train data**
+
+```{r}
+modelQ4_1 <- lm(Apps ~ ., data = train)
+
+#summary(modelQ4_1)
+
+# sum squared error on training data
+SSE_tr <- mean(modelQ4_1$residuals^2) 
+SSE_tr
 ```
 
 **Generating Predictions (`predict`)**
@@ -405,6 +590,16 @@ spec_0.5 <- conf_0.5[1,1] / sum(conf_0.5[,1])
 acc_0.25 <- (conf_0.25[1,1] + conf_0.25[2,2]) / sum(conf_0.25)
 sens_0.25 <- conf_0.25[2,2] / sum(conf_0.25[,2])
 spec_0.25 <- conf_0.25[1,1] / sum(conf_0.25[,1])
+**Mean/Average Sum of squared error (MSE)**
+
+```{r}
+# sum squared error on training data
+SSE_tr <- mean(modelQ4_1$residuals^2) 
+
+## Average sum of squared error on testset
+predQ4_1 <- predict(model, newdata=test)
+SSE_te <- mean((test$Apps - predQ4_1)^2) 
+SSE_te
 ```
 
 **Test Set SSE & R² (for Linear Models)** \* **CRITICAL RULE:** `sst` (Total Sum of Squares) for the test set *must* be calculated using the mean of the **training set's** outcome. A negative Test R² is possible and means the model is worse than a simple horizontal line at the training mean.
@@ -414,6 +609,9 @@ predictions_lm <- predict(lm_model, newdata=test)
 sse <- sum((predictions_lm - test$outcome)^2)
 sst <- sum((test$outcome - mean(train$outcome))^2)
 test_R2 <- 1 - sse / sst
+
+
+
 ```
 
 **ROC Curve & AUC (`ROCR` library)** \* AUC measures the model's ability to discriminate between classes. 0.5 is random chance, 1.0 is a perfect classifier.
@@ -427,11 +625,36 @@ perfObj <- performance(predObj, measure="tpr", x.measure="fpr")
 plot(perfObj, colorize=TRUE)
 # Calculate AUC value
 auc <- performance(predObj, measure="auc")@y.values[[1]]
+
+```
+
+**Calculate Test R-squared**
+
+```{r}
+#sse <- sum((predictions - log(test_wine$price91))^2)
+#sst <- sum((log(test_wine$price91) - mean(log(train_wine$price91)))^2)
+#test_R2 <- 1 - sse / sst
 ```
 
 # 5. Model Selection & Diagnostics
 
-**Model Selection Criteria** \* **Adjusted R²:** (`summary(lm_model)$adj.r.squared` or `summary(regsubsets_obj)$adjr2`). **Higher is better.** For comparing `lm` models. \* **AIC (Akaike Info Criterion):** (`glm_model$aic`). **Lower is better.** For comparing `glm` models. \* **BIC (Bayesian Info Criterion):** (`summary(regsubsets_obj)$bic`). **Lower is better.** For `regsubsets`. Penalizes complexity more than AIC. \* **Test Set SSE:** `sum((predictions - actuals)^2)`. **Lower is better.** The ultimate tie-breaker and measure of out-of-sample performance.
+**Model Selection Criteria**
+
+\* **Adjusted R²:** (`summary(lm_model)$adj.r.squared` or `summary(regsubsets_obj)$adjr2`).
+
+**Higher is better.** For comparing `lm` models.
+
+\* **AIC (Akaike Info Criterion):** (`glm_model$aic`). **Lower is better.**
+
+For comparing `glm` models.
+
+\* **BIC (Bayesian Info Criterion):** (`summary(regsubsets_obj)$bic`). **Lower is better.**
+
+For `regsubsets`. Penalizes complexity more than AIC.
+
+\* **Test Set SSE:** `sum((predictions - actuals)^2)`. **Lower is better.**
+
+The ultimate tie-breaker and measure of out-of-sample performance.
 
 **Finding the Best Model with `regsubsets`**
 
@@ -593,4 +816,1563 @@ quad_model <- lm(mpg ~ horsepower + I(horsepower^2), data=auto)
 anova(linear_model, quad_model)
 ```
 
+### **Finding the Best Model with \`regsubsets\`**
+
+```{r}
+# After fitting `models_best <- regsubsets(...)`, you need to analyze the results.
+summary_subsets <- summary(models_best)
+
+# Plot the selection criteria to visually choose the best model size
+plot(summary_subsets$adjr2, type="l", xlab="Number of Variables", ylab="Adjusted R-squared")
+plot(summary_subsets$bic, type="l", xlab="Number of Variables", ylab="BIC")
+
+# Programmatically find the best model size for a criterion
+best_size_bic <- which.min(summary_subsets$bic)
+cat("Best model size according to BIC:", best_size_bic, "\n")
+
+# Get the coefficients for that specific best model
+coef(models_best, id = best_size_bic)
+
+### LASSO Regression with Cross-Validation (`glmnet`)
+# LASSO is a modern alternative that performs regularization and feature selection.
+
+library(glmnet)
+
+# 1. Create the model matrix (X) and response vector (y)
+# The `model.matrix` function automatically handles dummy variables for factors.
+x <- model.matrix(Salary ~ ., data = Hitters)[, -1] # Exclude intercept column
+y <- Hitters$Salary
+
+# 2. Perform cross-validation to find the best lambda
+# `alpha=1` is for LASSO.
+set.seed(1) # For reproducibility
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+
+# 3. Plot the cross-validation error curve
+plot(cv_lasso)
+
+# 4. Extract coefficients from the best models
+# `lambda.min`: The lambda that gives the minimum cross-validated error.
+coef(cv_lasso, s = "lambda.min")
+# `lambda.1se`: The most parsimonious model whose error is within one standard error of the minimum.
+# Often preferred to prevent overfitting.
+coef(cv_lasso, s = "lambda.1se")
+
+cvmodelQ4_4$glmnet.fit
+# test error on model
+predQ4_4 <- predict(modelQ4_4,
+                    s=cvmodelQ4_4$lambda.min,
+                    newx=Xglm[testid,])
+
+te <- mean((predQ4_4 - yglm[testid])^2)  # test error of best model
+te
+
+```
+
+**Calculating Test Set R² (for Linear Models)**
+
+```{r}
+# A negative Test R² is possible and is a major red flag. It means your model
+# performs WORSE on the test set than a simple horizontal line at the training mean.
+
+# 1. Fit your linear model ON THE TRAINING DATA
+lm_model <- lm(medv ~ lstat, data = train_set)
+
+# 2. Make predictions ON THE TEST DATA
+predictions_lm <- predict(lm_model, newdata = test_set)
+
+# 3. Calculate SSE (Sum of Squared Errors) on the test set
+sse <- sum((test_set$medv - predictions_lm)^2)
+
+# 4. Calculate SST (Total Sum of Squares) on the test set using the TRAINING mean
+sst <- sum((test_set$medv - mean(train_set$medv))^2)
+
+# 5. Calculate the Test R-squared
+test_R2 <- 1 - sse / sst
+```
+
 ------------------------------------------------------------------------
+
+**Backward stepwise selection**
+
+```{r}
+modelQ4_2sub <- regsubsets(Apps~., data = train,
+                           nvmax = NULL,  # alternatively, 17
+                           method = "backward")
+```
+
+**Best varaibles for highest adjutest r\^2**
+
+```{r}
+plot(summary(modelQ4_2sub)$adjr2)
+n_vars <- which.max(summary(modelQ4_2sub)$adjr2) # number of variables to be included 
+coef_vars <- coef(modelQ4_2sub, n_vars) # coefficients of variables to be included
+sel_vars <- names(coef_vars) # names of variables to be included (includes intercept)
+sel_vars
+```
+
+## Formal Model Comparison (F-test) - **NEW**
+
+```{r anova_test, eval=FALSE}
+# Use `anova(model_simple, model_complex)` to test if a more complex **nested** linear model is a statistically significant improvement over a simpler one.
+# *H₀: The additional coefficients in the complex model are all zero.*
+# A small p-value (`Pr(>F) < 0.05`) means you **reject H₀** and prefer the complex model.
+# Example: Is a quadratic model significantly better than a linear one?
+linear_model <- lm(mpg ~ horsepower, data=auto)
+quad_model <- lm(mpg ~ horsepower + I(horsepower^2), data=auto)
+anova(linear_model, quad_model)
+
+# Example: Are two extra predictors jointly significant?
+model_reduced <- lm(mpg ~ wt + hp, data=mtcars)
+model_full <- lm(mpg ~ wt + hp + cyl + disp, data=mtcars)
+anova(model_reduced, model_full)
+```
+
+# 6. Visualization
+
+```{r}
+### Advanced Visualization & Diagnostics (ggplot2 & others)
+
+#### Diagnostic Plots for Linear Models (`lm`)
+# The autoplot() function from ggfortify is a powerful one-liner for this.
+# It creates four essential plots: Residuals vs Fitted, Normal Q-Q,
+# Scale-Location, and Residuals vs Leverage.
+library(ggfortify)
+model <- lm(mpg ~ horsepower, data=auto)
+autoplot(model)
+
+# The base R `plot()` function for lm models does the same thing.
+# The `which` argument lets you select a specific plot.
+plot(model, which = 1) # Shows Residuals vs. Fitted plot
+
+#### Scatter Plot Matrices (`pairs.panels` from `psych`)
+# Excellent for seeing correlations, distributions, and scatter plots for all
+# variables at once. CRITICAL for spotting multicollinearity early.
+library(psych)
+pairs.panels(my_data[, c("var1", "var2", "var3")], ellipses=F, lm=T)
+
+#### Visualizing Classification Boundaries (`partimat` from `klaR`)
+# This is the key function from the Challenger notebook to see the difference
+# between LDA and QDA.
+library(klaR)
+partimat(response_factor ~ pred1 + pred2, data = my_data, method = "lda")
+partimat(response_factor ~ pred1 + pred2, data = my_data, method = "qda")
+
+#print both polynomial and linear line
+ggplot(boston)+geom_point(aes(lstat,medv))+geom_line(aes(lstat,pr1),color="blue",size=2)+geom_line(aes(lstat,pr5),color="red",linetype="solid",size=2)
+
+```
+
+------------------------------------------------------------------------
+
+# [Assignment 2]
+
+```{r}
+rm(list=ls())
+#install.packages("ggplot2")
+#install.packages("psych")
+#install.packages("ggfortify")
+library("ggplot2")
+library("psych")
+library("ggfortify")
+```
+
+# 9
+
+9.  This problem involves the `Boston` dataset. This data was part of an important paper in 1978 by Harrison and Rubinfeld titled **Hedonic housing prices and the demand for clean air** published in the *Journal of Environmental Economics and Management 5(1): 81-102*. The dataset has the following fields:\
+
+-   `crim`: per capita crime rate by town\
+-   `zn`: proportion of residential land zoned for lots over 25,000 sq.ft
+-   `indus`: proportion of non-retail business acres per town
+-   `chas`: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)\
+-   `nox`: nitrogen oxides concentration (parts per 10 million)
+-   `rm`: average number of rooms per dwelling\
+-   `age`: proportion of owner-occupied units built prior to 1940\
+-   `dis`: weighted mean of distances to five Boston employment centres\
+-   `rad`: index of accessibility to radial highways\
+-   `tax`: full-value property-tax rate per \$10,000\
+-   `ptratio`: pupil-teacher ratio by town\
+-   `black`: $1000(Bk-0.63)^2$ where Bk is the proportion of black residents by town\
+-   `lstat`: lower status of the population (percent)\
+-   `medv`: median value of owner-occupied homes in \$1000s\
+    We will try to predict the median house value using thirteen predictors.
+
+(a) For each predictor, fit a simple linear regression model using a single variable to predict the response. In which of these models is there a statistically significant relationship between the predictor and the response? Plot the figure of relationship between medv and lstat as an example to validate your finding.\
+    *Answer.* We show linear model for `model1` and `model13` below. It should be done for all models to check that the p-values are close to zero for testing $H_0: \beta_j=0$ for $j=1,\ldots,13$.
+
+```{r}
+boston <- read.csv("Boston.csv")
+colnames(boston)
+model1 <- lm(medv~crim, data=boston)
+model2 <- lm(medv~zn, data=boston)
+model3 <- lm(medv~indus, data=boston)
+model4 <- lm(medv~chas, data=boston)
+model5 <- lm(medv~nox, data=boston)
+model6 <- lm(medv~rm, data=boston)
+model7 <- lm(medv~age, data=boston)
+model8 <- lm(medv~dis, data=boston)
+model9 <- lm(medv~rad, data=boston)
+model10 <- lm(medv~tax, data=boston)
+model11 <- lm(medv~ptratio, data=boston)
+model12 <- lm(medv~black, data=boston)
+model13 <- lm(medv~lstat, data=boston)
+
+summary(model1)
+
+# Verify this for all the models by checking that the p-values are close to 0.
+
+summary(model13)
+ggplot(boston,aes(lstat,medv))+geom_point(na.rm=T)+geom_smooth(method="lm",na.rm=T,se=F)
+
+
+```
+
+(b) Fit a multiple linear regression models to predict your response using all the predictors. Compare the adjusted $R^2$ from this model with the simple regression model. For which predictors, can we reject the null hypothesis $H_0:\beta_j=0$?\
+    *Answer.* The adjusted $R^2$ is 0.7338 which is larger than the adjusted $R^2$ from any of the simple regression models. The variables for which we can reject the $H_0: \beta_j=0$ are `crim, zn, chas, nox, rm, dis, rad, tax, ptratio, black, lstat` at the 0.05 significance level.
+
+```{r}
+modelall<- lm(medv~., data=boston)
+summary(modelall)
+attr(modelall$coefficients, "names")[modelall$coefficients <= 0.05]
+```
+
+(c) Create a plot displaying the univariate regression coefficients from
+    (a) on the X-axis and the multiple regression coefficients from (b) on the Y-axis. That is each predictor is displayed as a single point in the plot. Comment on this plot.\
+        *Answer.* The figure seems to indicate a fairly positive relationship between the results from the simple and multiple linear regression models. The relationship seems to be linear too.
+
+```{r}
+Ind <- c(model1$coef[2], model2$coef[2], model3$coef[2], model4$coef[2], model5$coef[2],
+model6$coef[2], model7$coef[2], model8$coef[2], model9$coef[2], model10$coef[2],
+model11$coef[2], model12$coef[2], model13$coef[2])
+All <- modelall$coef[2:14]
+ggplot(cbind(Ind,All),aes(Ind,All)) + geom_point()+geom_smooth(method="lm",se=F)+ggtitle("Coefficient relationship") + xlab("Simple linear regression") + ylab("Multiple linear regression")
+```
+
+(d) In this question, we will check if there is evidence of non-linear association between the `lstat` predictor variable and the response? To answer the question, fit a model of the form\
+    `medv` = $\beta_0$+ $\beta_0$`lstat` + $\beta_0$`lstat2` + $\epsilon$.\
+    You can make use of the `poly()` function in R. Does this help improve the fit? Add higher degree polynomials to fit the data. What is the degree of the polynomial fit beyond which the terms no longer remain significant?\
+    *Answer.* Yes, adding higher-degree terms helps improve the fit. Beyond degree 5, adding additional terms does not seem to improve the model (additional parameters do not remain significant).\
+    We plot the data points `(lstat,medv)` along with the linear (blue curve) and polynomial of degree 5 (red curve) fits below.
+
+```{r}
+summary(model13)
+modelpoly2 <- lm(medv~poly(lstat,2,raw=TRUE), data = boston)
+summary(modelpoly2)
+modelpoly3 <- lm(medv~poly(lstat,3,raw=TRUE), data = boston)
+summary(modelpoly3)
+modelpoly4 <- lm(medv~poly(lstat,4,raw=TRUE), data = boston)
+summary(modelpoly4)
+modelpoly5 <- lm(medv~poly(lstat,5,raw=TRUE), data = boston)
+summary(modelpoly5)
+modelpoly6 <- lm(medv~poly(lstat,6,raw=TRUE), data = boston)
+summary(modelpoly6)
+
+boston$pr1 <- predict(model13,newdata=boston)
+boston$pr5 <- predict(modelpoly5,newdata=boston)
+
+ggplot(boston)+geom_point(aes(lstat,medv))+geom_line(aes(lstat,pr1),color="blue",size=2)+geom_line(aes(lstat,pr5),color="red",linetype="solid",size=2)
+```
+
+# 10
+
+10. Orley Ashenfelter in his paper "**Predicting the Quality and Price of Bordeaux Wines**" published in *The Economic Journal* showed that the variability in the prices of Bordeaux wines is predicted well by the weather that created the grapes. In this question, you will validate how these results translate to a dataset for wines produced in Australia. The data is provided in the file `winedata.csv`. The dataset contains the following variables:\
+
+-   `vintage`: year the wine was made\
+-   `price91`: 1991 auction prices for the wine in dollars\
+-   `price92`: 1992 auction prices for the wine in dollars\
+-   `temp`: Average temperature during the growing season in degree Celsius\
+-   `hrain`: total harvest rain in mm\
+-   `wrain`: total winter rain in mm\
+-   `tempdiff`: sum of the difference between the maximum and minimum temperatures during the growing season in degree Celsius\
+
+(a) Define two new variables `age91` and `age92` that captures the age of the wine (in years) at the time of the auctions. For example, a 1961 wine would have an age of 30 at the auction in 1991. What is the average price of wines that were 15 years or older at the time of the 1991 auction?\
+    *Answer.* The average price of wine that were 15 years or older at the 1991 auction is \$96.44.
+
+```{r}
+wine<-read.csv("winedata.csv")
+str(wine)
+wine$age91<-1991-wine$vintage
+wine$age92<-1992-wine$vintage
+mean(subset(wine$price91,wine$age91>=15))
+```
+
+(b) What is the average price of the wines in the 1991 auction that were produced in years when both the harvest rain was below average and the temperature difference was below average?\
+    *Answer.* The average price in 1991 when harvest rain and temperature difference were below average is \$72.87.
+
+```{r}
+mean(subset(wine$price91,wine$hrain<mean(wine$hrain)&wine$tempdiff<mean(wine$tempdiff)))
+```
+
+(c) In this question, you will develop a simple linear regression model to fit the log of the price at which the wine was auctioned in 1991 with the age of the wine. To fit the model, use a training set with data for the wines up to (and including) the year 1981. What is the R-squared for this model?\
+    *Answer.* $R^2$ for this model is 0.6675.
+
+```{r}
+train<-subset(wine,vintage<=1981)
+model1<-lm(log(price91)~age91,data=train)
+summary(model1)
+```
+
+(d) Find the 99% confidence interval for the estimated coefficients from the regression.\
+    *Answer.*\
+    For `intercept` ($\beta_0$): [3.159, 3.98].\
+    For `age`($\beta_1$): [0.022, 0.062].
+
+```{r}
+confint(model1, level = 0.99)
+```
+
+(e) Use the model to predict the log of prices for wines made from 1982 onwards and auctioned in 1991. What is the test R-squared?\
+    *Answer.* Test $R^2=0.9213742.$
+
+```{r}
+test<-subset(wine,vintage>=1982)
+predtest<-predict(model1,newdata=test)
+predtest
+log(test$price91)
+
+sse<-sum((log(test$price91)-predtest)^2)
+sst<-sum((log(test$price91)-mean(log(train$price91)))^2)
+sse
+sst
+sst-sse
+
+ssr<-sum((predtest-mean(log(train$price91)))^2)
+
+  ssr  
+  
+testR2<- 1-sse/sst
+testR2
+```
+
+(f) Which among the following options describes best the quality of fit of the model for this dataset in comparison with the Bordeaux wine dataset that was analyzed by Orley Ashenfelter?
+    -   The result indicates that the variation of the prices of the wines in this dataset is explained much less by the age of the wine in comparison to Bordeaux wines.
+    -   The result indicates that the variation of the prices of the wines in this dataset is explained much more by the age of the wine in comparison to Bordeaux wines.
+    -   The age of the wine has no predictive power on the wine prices in both the datasets.\
+        *Answer.* In comparison to the results for the Bordeaux wine data, the training (model) $R^2$ and test $R^2$ is higher for this new dataset. This seems to indicate that the variation in the prices of the wine in this dataset is explained much more by the age of the wines in comparison to the Bordeaux dataset.
+(g) Construct a multiple regression model to fit the log of the price at which the wine was auctioned in 1991 with all the possible predictors (`age91, temp, hrain, wrain, tempdiff`) in the training dataset. To fit your model, use the data for wines made up to (and including) the year 1981. What is the R-squared for the model?\
+    *Answer.* For this model $R^2=0.7938.$
+
+```{r}
+model2<-lm(log(price91)~temp+hrain+wrain+tempdiff+age91,data=train)
+summary(model2)
+```
+
+(h) Is this model preferred to the model with only the age variable as a predictor (use the adjusted R-squared for the model to decide on this)?\
+    *Answer.* With only the age variable, adjusted $R^2=0.65$. On the other hand, with all the variables, adjusted $R^2=0.7145$. This seems to indicate that the latter model (with more variables included) is preferred.
+
+(i) Which among the following best describes the output from the fitted model?
+
+    -   The result indicates that lower the temperature, the higher the price and quality of the wine
+    -   The result indicates that greater the temperature difference, the higher the price and quality of wine.
+    -   The result indicates that lesser the harvest rain, the higher the price and quality of the wine.
+    -   The result indicates that winter rain is a very important variable in the fit of the data.\
+        *Answer.* The result indicates that the lesser the harvest rain, the higher the price and the quality of the wine will be. This is because the corresponding $\beta=-0.003$ and is significant at the 10% level. All other statements appear to be false.
+
+(j) Of the five variables (`age91, temp, hrain, wrain, tempdiff`), drop the two variables that are the least significant from the results in (g). Rerun the linear regression and write down your fitted model.\
+    *Answer.* The least significant variables are `wrain` and `tempdiff` with p-values 0.53 and 0.416 respectively and we create `model3` removing the two.
+
+```{r}
+model3<-lm(log(price91)~temp+hrain+age91,data=train)
+summary(model3)
+```
+
+(k) Is this model preferred to the model with all variables as predictors (use the adjusted R-squared in the training set to decide on this)?\
+    *Answer.* In the training set, adjusted $R^2$ for this model is 0.73 while for `model2`, adjsuted $R^2$ is 0.7145. In this case, the new `model3` is preferred to `model2`.
+
+(l) Using the variables identified in (j), construct a multiple regression model to fit the log of the price at which the wine was auctioned in 1992 (remember to use `age92` instead of `age91`). To fit your model, use the data for wines made up to (and including) the year 1981. What is the R-squared value for the model?\
+    *Answer.* $R^2$ for this model is 0.5834.
+
+```{r}
+model4<-lm(log(price92)~temp+hrain+age92,data=train)
+summary(model4)
+```
+
+(m) Suppose in this application, we assume that a variable is statistically significant at the 0.2 level. Would you reject the hypothesis that the coefficient for the variable `hrain` is zero?\
+    *Answer.* The p-value for hrain is 0.32. Hence we cannot reject the null hypothesis that the coefficient for `hrain` is zero.
+
+(n) By separately estimating the equations for the wine prices for each auction, we can better establish the credibility of the explanatory variables because:
+
+    -   We have more data to fit our models with.
+    -   The effect of the weather variables and age of the wine (sign of the estimated coefficients) can be checked for consistency across years.
+    -   1991 and 1992 are the markets when the Australian wines were traded heavily. Select the best option.\
+        *Answer.* The best explanation seems to be that we can check for consistency of the effect of weather variables and age by looking at the sign of the estimated coefficients.
+
+(o) The current fit of the linear regression using the weather variables drops all observations where any of the entries are missing. Provide a short explanation on when this might not be a reasonable approach to use.\
+    *Answer.* Clearly, dropping missing entries is reliable. However, if there are many missing entries, then this implies we can lose a lot of data.
+
+# 11.
+
+## (a)
+
+Q: Each row in the baseball dataset represents a team in a particular year. Read the data into a dataframe called `baseballlarge`.
+
+A:
+
+```{r 1_a}
+baseballlarge <- read.csv("baseballlarge.csv")
+# str(baseballlarge)
+
+# while we will be commenting out all str(data.frame) calls
+# it is still advisable to take at least one look at it
+# but it is often not directly relevant to questions
+```
+
+### i.
+
+Q: How many team/year pairs are there in the whole dataset?
+
+A:
+
+```{r 1_a_i}
+# number of observations equal to number of rows
+nrow(baseballlarge)
+```
+
+There are a total of 1232 team/year pairs in the whole dataset.
+
+### ii.
+
+Q: Though the dataset contains data from 1962 until 2012, we removed several years with shorter-than-usual seasons. Using the `table()` function, identify the total number of years included in this dataset.
+
+A:
+
+```{r 1_a_ii}
+# number of entries can be counted with length()
+length(table(baseballlarge$Year)) 
+
+```
+
+There are a total of 47 years included in the dataset though it ranges from 1962 to 2012.
+
+### iii.
+
+Q: Since we are only analyzing teams that made the playoffs, use the `subset()` function to create a smaller data frame limited to teams that made the playoffs. Your subsetted data frame should still be called `baseballlarge`. How many team/year pairs are included in the new dataset?
+
+A:
+
+```{r 1_a_iii}
+baseballlarge <- subset(baseballlarge, Playoffs == 1)
+nrow(baseballlarge)
+```
+
+There are a total of 244 team/year pairs in the new dataset.
+
+### iv.
+
+Q: Through the years, different numbers of teams have been invited to the playoffs. Find the different number of teams making the playoffs across the seasons.
+
+A: The following code shows the number of teams at the playoffs over the years.
+
+```{r 1_a_iv1}
+table(baseballlarge$Year)
+```
+
+The top row is the year, and the bottom row is the number of teams.
+
+## (b)
+
+It is much harder to win the World Series if there are 10 teams competing for the championship versus just two. Therefore, we will add the predictor variable `NumCompetitors` to the data frame. `NumCompetitors` will contain the number of total teams making the playoffs in the year of a particular team/year pair. For instance, `NumCompetitors` should be 2 for the 1962 New York Yankees, but it should be 8 for the 1998 Boston Red Sox. We want to look up the number of teams in the playoffs for each team/year pair in the dataset, and store it as a new variable named `NumCompetitors` in the data frame. Do this. How many playoff team/year pairs are there in the dataset from years where 8 teams were invited to the playoffs?
+
+A:
+
+```{r 1_b1}
+year_col <- baseballlarge$Year
+
+#the column of Year values, given by as.character(year_col), are taken and mapped to values as found in table(year_col). They are then assigned to a new column NumCompetitors
+baseballlarge$NumCompetitors <- table(year_col)[as.character(year_col)]
+table(baseballlarge$NumCompetitors)
+```
+
+To retrieve the number directly:
+
+```{r 1_b2}
+table(baseballlarge$NumCompetitors)["8"]  #this lets us see the value 8, and count 128
+unname(table(baseballlarge$NumCompetitors)["8"]) # with unname(), we can retrieve 128 directly
+```
+
+There were 128 team/year pairs where 8 teams were invited to the playoffs. (Note that we can also verify this with [iv.](#oneaiv) as 8 \* 16 = 128)
+
+## (c)
+
+Q: In this problem, we seek to predict whether a team won the World Series; in our dataset this is denoted with a `RankPlayoffs` value of 1. Add a variable named `WorldSeries` to the data frame that takes value 1 if a team won the World Series in the indicated year and a 0 otherwise. How many observations do we have in our dataset where a team did NOT win the World Series?
+
+A:
+
+```{r 1_c1}
+baseballlarge$WorldSeries <- as.integer(baseballlarge$RankPlayoffs == 1) #as.integer converts TRUE to 1 and FALSE to 0
+table(baseballlarge$WorldSeries)
+```
+
+Let's retrieve the value without "0" as the header,
+
+```{r 1_c2}
+unname(table(baseballlarge$WorldSeries)["0"])
+```
+
+There are 197 team/year pairs in the dataset who did not win the World Series.
+
+## (d)
+
+Q: When we are not sure which of our variables are useful in predicting a particular outcome, it is often helpful to build simple models, which are models that predict the outcome using a single independent variable. Which of the variables is a significant predictor of the `WorldSeries` variable in a logistic regression model? To determine significance, remember to look at the stars in the summary output of the model. We'll define an independent variable as significant if there is at least one star at the end of the coefficients row for that variable (this is equivalent to the p-value column having a value smaller than 0.05). Note that you have to build multiple models - with each model having a single independent variable from (this is equivalent to the probability column having a value smaller than 0.05). Note that you have to build multiple models ( `Year`, `RS`, `RA`, `W`, `OBP`, `SLG`, `BA`, `RankSeason`, `NumCompetitors`, `League`) to answer this question (you can code the `League` variable as a categorical variable). Use the dataframe `baseballlarge` to build the models.
+
+A: First of all we will do this in a simple manner before trying an approach that scales better:
+
+```{r 1_d1}
+model_1_d <- glm(WorldSeries ~ Year, data = baseballlarge, family = binomial)
+summary(model_1_d)
+```
+
+As can be seen, a massive output is printed. While IQR, deviance and so on are useful in general, they are not critical to the task as given by the question. Our aim is simply to check the p-value against 0.05.
+
+As a tip, check what named elements a named list has in RStudio by using `$`:
+
+```{r 1_tip}
+# in this example we will just grab a random element from the summary
+x <- summary(model_1_d)  # to make a short-named new variable
+x$iter # simply type "x$" and wait for RStudio to suggest things
+# number of Newton-Raphson iterations, good to know but not critical
+```
+
+We can take the p-value directly from the `summary(model)` object directly:
+
+```{r 1_d2}
+# we use [2, 4] as following models will only have 1 variable anyway
+# one can get the p-value column using [,4]
+# 'coefficients' can be shortened to 'coef' i.e. summary(model1)$coef
+# assuming no other elements named 'coef' or similar were added
+summary(model_1_d)$coefficients[2, 4] 
+```
+
+Scaling up, we write a for-loop to do this for all variables.
+
+```{r 1_d3}
+# initialise some containers we will add to later
+p_val_1_d <- c() #to save our p-values for later
+model_list_1 <- list()  # to contain all the models later
+all_vars_1 <- c("Year", "RS", "RA", "W", "OBP", "SLG", "BA",
+                "RankSeason", "NumCompetitors", "League")
+
+#to train single-variable models                                                                                           
+for (variable in all_vars_1) {
+
+    model <- glm(as.formula(paste0("WorldSeries ~ ", variable)),
+                 data = baseballlarge, family = binomial)
+    model_list_1[[variable]] <- model #save the trained model in the list
+    # we are appending a named numeric variable, for reference later
+    p_val_1_d <- c(p_val_1_d,
+                   setNames(summary(model)$coefficients[2, 4], variable))  
+}
+p_val_1_d
+```
+
+We directly get the significance variables at the 5% significance level with the following code:
+
+```{r 1_d4}
+sig_vars_1_d <- names(p_val_1_d[p_val_1_d < 0.05])
+sig_vars_1_d
+```
+
+The significant (at the 5% significance level) variables are `Year`, `RA`, `RankSeason` and `NumCompetitors`. However, by manual inspection of the p-values, we can see that `W` and `SLG` are quite close with p-values 0.0577 and 0.0504 respectively which are just a little short of 0.05.
+
+## (e)
+
+Q: In this question, we will consider multivariate models that combine the variables we found to be significant in (d). Build a model using all of the variables that you found to be significant in (d). How many variables are significant in the combined model?
+
+A: Note that while we will include the variables `Year`, `RA`, `RankSeason` and `NumCompetitors`, it also makes sense to include `W` and `SLG` since they have p-values close to 0.05.
+
+```{r 1_e1}
+sig_vars_1_e <- c(sig_vars_1_d, "W", "SLG") # add on manually considered W and SLG
+
+# with this we can make the formula without manually typing all the variable names
+# we need 2 paste0() as the sig_vars_1_d  are a vector of characters
+# we need to collapse sig_vars_1_e into string "Year + ... + SLG"
+formula_1 <- as.formula(paste0("WorldSeries ~ ",
+                               paste0(sig_vars_1_e, collapse = "+")))
+model_1_e <- glm(formula_1, data = baseballlarge, family = binomial)
+# p-values
+p_val_1_e <- summary(model_1_e)$coefficients[,4]
+p_val_1_e
+```
+
+We can check for significance at the 5% significance level quite simply:
+
+```{r 1_e2}
+names(p_val_1_e[p_val_1_e < 0.05])
+```
+
+Unfortunately, it seems that in this new multivariate model, none of the variables are significant. You can check that this is the same whether we added `W` and `SLG` or not.
+
+## (f)
+
+Q: Often, variables that were significant in single variable models are no longer significant in multivariate analysis due to correlation between the variables. Are there any such variables in this example? Which of the variable pairs have a high degree of correlation (a correlation greater than 0.8 or less than -0.8)?
+
+A: We can run the `cor()` function first:
+
+```{r 1_f1}
+corr_1 <- cor(baseballlarge[,sig_vars_1_d])
+corr_1
+```
+
+The answer is already in the above, and we can just read through the non-diagonal terms to check if they are \> 0.8. But here, we will show an approach which gets the variable names directly.
+
+```{r 1_f2}
+diag(corr_1) <- 0  # self-correlation not relevant
+row.names(which(corr_1 > 0.8, arr.ind = T))
+# x <- row.names(which(corr_1 > 0.8, arr.ind = T))  # NOT DISPLAYED
+# x
+```
+
+The variables which are highly correlated are `NumCompetitors` and `Year`.
+
+## (g)
+
+Q: Build all of the two variable models using variables in (e). You should compare them with the single variable models from (d). Which model has the best AIC value (the minimum AIC value)?
+
+A: We repeat the procedure in [(d)].
+
+```{r 1_g1}
+model_1_g <- glm(WorldSeries ~ Year + RA,
+                 data = baseballlarge, family = binomial)
+summary(model_1_g)
+```
+
+A lot of output, but in this part we are interested in the Akaike Information Criterion (AIC). After this, we will simply try to *not* display the raw output of `summary()` again.
+
+```{r 1_g2}
+summary(model_1_g)$aic  # we can use this to grab AIC directly
+```
+
+Instead of typing all the pairwise combinations of variables, we show an iterative approach below.
+
+```{r 1_g3}
+var_combns_1 <- combn(sig_vars_1_d, 2)  # combinations of 2 variables
+aic_table_1 <- data.frame(var_1 = character(), var_2 = character(),
+                          aic = numeric())
+
+#iterate through the pariwise combinations of variables
+for (idx in 1:choose(length(sig_vars_1_d), 2)) {
+    var_comb <- var_combns_1[,idx] #get the combination of variables
+
+    model <- glm(formula(paste0("WorldSeries ~ ", paste0(var_comb, collapse = "+"))),
+             data = baseballlarge, family = binomial)
+    # note that rbind is relatively slow but this is not too important
+    aic_table_1 <- rbind(aic_table_1,
+                         data.frame(var1 = var_comb[1],
+                                    var2 = var_comb[2],
+                                    aic = summary(model)$aic))
+
+}
+#iterate through all the original variables (single variables)
+for (model in model_list_1) {
+    aic_table_1 <- rbind(aic_table_1,
+                         data.frame(var1 = names(model$coefficients)[2],
+                                    var2 = NA,  # NULL does not work
+                                    aic = model$aic))
+}
+aic_table_1
+```
+
+As usual, there are a lot of numbers to look through. To simplify things we can just print the row with minimum AIC:
+
+```{r 1_g4}
+aic_table_1[which.min(aic_table_1[,3]),]
+```
+
+This shows that the model `World Series ~ NumCompetitors` has the best AIC value.
+
+## (h)
+
+Q: Comment on your results.
+
+A: Disappointingly, and somewhat unsurprisingly, it seems that in the winning of playoffs, the number of competitors is the single best and strongest predictor. The other predictors such as Wins, Runs Scored, Runs Allowed, On-Base Percentage, Slugging Percentage and Batting Average do not seem to be as good (linear) predictors.
+
+```{r 1_end}
+#use this to help you clear your environment :)
+setdiff(ls(), ls(pattern = "SETUP"))
+rm(list = setdiff(ls(), ls(pattern = "SETUP")))
+```
+
+# 12
+
+## (a)
+
+Q: Load the dataset `Parole.csv` into a data frame called `Parole`. How many parolees are contained in the dataset?
+
+A:
+
+```{r 2_a}
+Parole <- read.csv("Parole.csv")
+# str(Parole)
+nrow(Parole)
+```
+
+There are a total of 675 parolees in this dataset.
+
+## (b)
+
+Q: How many of the parolees in the dataset violated the terms of their parole?
+
+A:
+
+```{r 2_b}
+unname(table(Parole$Violator)[2])  # col of "1" is the second element
+```
+
+78 of the parolees violated the terms of their parole.
+
+## (c)
+
+Q: Factor variables are variables that take on a discrete set of values and can be either unordered or ordered. Names of countries indexed by levels is an example of an unordered factor because there isn't any natural ordering between the levels. An ordered factor has a natural ordering between the levels (an example would be the classifications "large", "medium" and "small"). Which variables in this dataset are unordered factors with at least three levels? To deal with unordered factors in a regression model, the standard practice is to define one level as the "reference level" and create a binary variable for each of the remaining levels. In doing so, a factor with *n* levels is replaced by *n*-1 binary variables. We will see this in question [(e)].
+
+A:
+
+```{r 2_c}
+# We observe that there are 2 columns with factor type, State and Crime
+# NOTE: read.csv automatically converts characters to strings unless 'stringsAsFactors=F' is specified
+sapply(Parole, class)
+
+# If there is a column with character type you wish to convert eg.State, use: Parole$State <- as.factor(Parole$State)
+
+sapply(Parole[sapply(Parole, is.factor)], nlevels) #get the number of levels of each column
+```
+
+In this data, `State` and `Crime` are unordered factor variables with at least 3 variables (4 each).
+
+## (d)
+
+Q: To ensure consistent training/testing set splits, run the following 5 lines of code (do not include the line numbers at the beginning):
+
+`(1) > set.seed(144)`\linebreak `(2) > library(caTools)`\linebreak `(3) > split <- sample.split(Parole$Violator, SplitRatio = 0.7)`\linebreak `(4) > train <- subset(Parole, split == TRUE)`\linebreak `(5) > test <- subset(Parole, split == FALSE)`
+
+Roughly what proportion of parolees have been allocated to the training and testing sets?
+
+Now, suppose you re-ran lines (1)-(5) again. What would you expect?
+
+-   The exact same training/testing set split as the first execution of (1)-(5)
+-   A different training/testing set split from the first execution of (1)-(5)
+
+If you instead ONLY re-ran lines (3)-(5), what would you expect?
+
+-   The exact same training/testing set split as the first execution of (1)-(5)
+-   A different training/testing set split from the first execution of (1)-(5)
+
+If you instead called `set.seed()` with a different number and then re-ran lines (3)-(5), what would you expect?
+
+-   The exact same training/testing set split as the first execution of (1)-(5)
+-   A different training/testing set split from the first execution of (1)-(5)
+
+A: In the split, roughly 70% of the parolees have been assigned to the training and 30% to the test set. If you rerun the commands (1) - (5), we would expect to get the same training/test split as the first execution, and this is because we set the random seed (used by the random number generator) to be the same. It follows naturally that if we only run commands (3) - (5) without setting a seed, or setting a seed to a different number from 144, we would get a different training/test split.
+
+All of this can be verified fairly easily, although we will use different variable names:
+
+```{r 2_d1}
+set.seed(144)
+library(caTools)
+s1 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr1 <- subset(Parole, s1 == TRUE)
+te1 <- subset(Parole, s1 == FALSE)
+```
+
+The second split,
+
+```{r 2_d2}
+set.seed(144)
+library(caTools)
+s2 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr2 <- subset(Parole, s2 == TRUE)
+te2 <- subset(Parole, s2 == FALSE)
+```
+
+Now we compare them:
+
+```{r 2_d3, results = "hold"}
+identical(s1, s2, FALSE, FALSE, FALSE, FALSE)
+identical(tr1, tr2, FALSE, FALSE, FALSE, FALSE)
+identical(te1, te2, FALSE, FALSE, FALSE, FALSE)
+```
+
+If anything but three `TRUE`s were returned, then something would have been wrong. One may opt to check with some memory-checking functions that the objects above being checked for being the same are actually residing in different parts of the computer's memory.[^1] (Else if they were the same object in memory, it would make sense they would pass checks of being identical.) Further, running `library(caTools)` is not required other than the first time, and should not affect the splits.
+
+[^1]: See <https://stackoverflow.com/a/10913296>
+
+Next we just check without setting the seed:
+
+```{r 2_d4}
+s3 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr3 <- subset(Parole, s3 == TRUE)
+te3 <- subset(Parole, s3 == FALSE)
+identical(s1, s3, FALSE, FALSE, FALSE, FALSE)
+```
+
+We can check further with a different seed:
+
+```{r 2_d5}
+set.seed(3) # also equal to  569936821221962380720**3 +
+            #               -569936821113563493509**3 +
+            #               -472715493453327032   **3
+# cannot verify in R without precision of around 210 bits
+s4 <- sample.split(Parole$Violator, SplitRatio = 0.7)
+tr4 <- subset(Parole, s4 == TRUE)
+te4 <- subset(Parole, s4 == FALSE)
+identical(s1, s4, FALSE, FALSE, FALSE, FALSE)
+```
+
+## (e)
+
+Q: If you tested other training/testing set splits in the previous section, please re-run the original 5 lines of code to obtain the original split. Using `glm`, train a logistic regression model on the training set. Your dependent variable is `Violator`, and you should use all the other variables as independent variables. What variables are significant in this model? Significant variables should have a least one star, or should have a p-value less than 0.05
+
+A:
+
+```{r 2_e1}
+set.seed(144)
+library(caTools)  # not required by this point
+split <- sample.split(Parole$Violator, SplitRatio = 0.7)
+train <- subset(Parole, split == TRUE)
+test <- subset(Parole, split == FALSE)
+# keeping the variable names, although preferably label by question
+```
+
+As before we run the `glm()` function,
+
+```{r 2_e2}
+model_2 <- glm(Violator ~ ., data = train, family = binomial)
+#summary(model_2)
+```
+
+But we simply seek to get the significant variables:
+
+```{r 2_e3}
+coef_table_2 <- summary(model_2)$coefficients #save the coefficients for later use
+p_val_2_e <- coef_table_2[,4]
+sig_vars_2 <- names(p_val_2_e[p_val_2_e <= 0.05])
+sig_vars_2
+```
+
+The significant variables at the 5% significance level are `RaceWhite`, `StateVirginia` and `MultipleOffenses`.
+
+## (f)
+
+Q: What can we say based on the coefficient of the `MultipleOffenses` variable?
+
+-   Our model predicts that parolees who committed multiple offenses have 1.61 times higher odds of being a violator than the average parolee.
+-   Our model predicts that a parolee who committed multiple offenses has 1.61 times higher odds of being a violator than a parolee who did not commit multiple offenses but is otherwise identical.
+-   Our model predicts that parolees who committed multiple offenses have 5.01 times higher odds of being a violator than the average parolee.
+-   Our model predicts that a parolee who committed multiple offenses has 5.01 times higher odds of being a violator than a parolee who did not commit multiple offenses but is otherwise identical.
+
+A:
+
+```{r 2_f, results = "hold"}
+# Get the corresponding coefficient of the 'MultipleOffenses' variable (amount of increase in log odds if one comitted multiple offenses)
+# Use row name to extract row (check spelling!); column 1 corresponds to coefficient column
+coef_multiple <- coef_table_2["MultipleOffenses", 1]
+exp(coef_multiple) # odds
+```
+
+The binary variable `MultipleOffenses` takes values 0 if a person did not commit multiple offenses, else 1. The increase in log odds is 1.61\*1 = 1.61 if the person commited multiple offenses.
+
+This means that the odds is equal to 5.01, and represents the odds of a parolee to be a violator with multiple offenses, compared to a person who did not commit multiple offenses but is otherwise identical. Statement (4) is the appropriate one.
+
+## (g)
+
+Q: Consider a parolee who is male, of white race, aged 50 years at prison release, from Kentucky, served 3 months, had a maximum sentence of 12 months, did not commit multiple offenses, and committed a larceny. According to the model, what are the odds this individual is a violator? According to the model, what is the probability this individual is a violator?
+
+A: The log odds of the given individual being a violator is
+
+```{r 2_g1}
+# Here we prep the coefficients we need
+coef_2 <- coef_table_2 #includes many coefficients we don't need
+
+# We want to remove the coefficients for StateLouisiana, StateOther, StateVirginia, CrimeDrugs, CrimeOther
+coef_2 <- coef_2[!(startsWith(rownames(coef_2), "State")  |
+                   startsWith(rownames(coef_2), "Crime")) |
+                 rownames(coef_2) == "CrimeLarceny",]
+
+# Or we can also choose the variables (rows) we want to keep
+# keep_var <- c("(Intercept)","Male", "RaceWhite", "Age", "TimeServed", "MaxSentence", "MultipleOffenses", "CrimeLarceny")
+# coef_2 <- coef_table_2[keep_var,]
+
+# Note that we retain CrimeLarceny because our prisoner has that
+# Also note that StateKentucky is being used as a reference
+# and hence there is no coefficient
+```
+
+```{r 2_g2}
+# Based on information given, define x_2
+x_2 <- c(1,  # intercept
+         1,  # male
+         1,  # white
+         50, # age
+         3,  # time served
+         12, # max sentence
+         0,  # multiple offenses
+         1)  # larceny
+logodds_2 <- coef_2[,1] %*% x_2  # matrix mult
+#logodds_2
+#exp(logodds_2)
+prob = exp(logodds_2)/ (1+exp(logodds_2))
+prob
+```
+
+The probability that the person with the given attributes is a violator, according to the model is 0.221.
+
+## (h)
+
+Q: Use the `predict()` function to obtain the model's predicted probabilities for parolees in the test set. What is the maximum predicted probability of a violation?
+
+A:
+
+```{r 2_h}
+# Use test data obtained from subsetting in (d)
+pred_2_h <- predict(model_2, newdata = test, type = "response")
+max(pred_2_h)
+```
+
+The maximum predicted probability of violation is 0.907.
+
+## (i)
+
+Q: In the following questions, evaluate the model's predictions on the test set using a threshold of 0.5. What is the model's sensitivity? What is the model's specificity? What is the model's accuracy?
+
+A:
+
+```{r 2_i1}
+pred_table_2 <- table((pred_2_h > 0.5), test$Violator)
+pred_table_2
+```
+
+The answer lies in the table above. Calculating with R directly:
+
+```{r 2_i2}
+# sensitivity (true positive rate)
+pred_table_2[2,2]/sum(pred_table_2[,2])
+```
+
+The Sensitivity (True Positive Rate) is 12/(11+12)=0.521
+
+```{r 2_i3}
+# specificity (true negative rate)
+pred_table_2[1,1]/sum(pred_table_2[,1])
+```
+
+The Specificity (True Negative Rate) is 167/(167+12)=0.932
+
+```{r 2_i4}
+# accuracy (accuracy)
+sum(diag(pred_table_2)/sum(pred_table_2))
+```
+
+The Accuracy is (167+12)/(167+11+12+12)=0.886
+
+## (j)
+
+Q: What is the accuracy of a simple model that predicts that every parolee is a non-violator?
+
+A:
+
+```{r 2_j}
+# To predict every parolee as a non-violator, model will have accuracy = total number of non-violators/total number of parolees
+table(test$Violator)[1]/nrow(test)
+# or anything that counts the 0s in the column
+```
+
+The accuracy of a simple model that predicts that every parolee is a non-violator is 179/202=0.886.
+
+## (k)
+
+Q: Consider a parole board using the model to predict whether parolees will be violators or not. The job of a parole board is to make sure that a prisoner is ready to be released into free society, and therefore parole boards tend to be particularily concerned with releasing prisoners who will violate their parole. Which of the following most likely describes their preferences and best course of action?
+
+-   The board assigns more cost to a false negative than a false positive, and should therefore use a logistic regression cutoff higher than 0.5.
+-   The board assigns more cost to a false negative than a false positive, and should therefore use a logistic regression cutoff less than 0.5.
+-   The board assigns equal cost to a false positive and a false negative, and should therefore use a logistic regression cutoff equal to 0.5.
+-   The board assigns more cost to a false positive than a false negative, and should therefore use a logistic regression cutoff higher than 0.5.
+-   The board assigns more cost to a false positive than a false negative, and should therefore use a logistic regression cutoff less than 0.5
+
+A: The answer is the second option. Clearly, in this context, false negatives are a worry where parolees who will be violators are released. Thus, it is natural for the board to assign more cost to false negatives than false positives, and should use a cutoff less than 0.5. Lowering the cutoff makes the model predict more people to be positive, thus reducing this undesirable outcome.
+
+## (l)
+
+Q: Which of the following is the most accurate assessment of the value of the logistic regression model with a cutoff 0.5 to a parole board, based on the model's accuracy as compared to the simple baseline model?
+
+-   The model is of limited value to the board because it cannot outperform a simple baseline, and using a different logistic regression cutoff is unlikely to improve the model's value.
+-   The model is of limited value to the board because it cannot outperform a simple baseline, and using a different logistic regression cutoff is likely to improve the model's value.
+-   The model is likely of value to the board, and using a different logistic regression cutoff is unlikely to improve the model's value.
+-   The model is likely of value to the board, and using a different logistic regression cutoff is likely to improve the model's value.
+
+A: The model is of likely value to the board since it can provide a better characterisation than the simple model. While both models have the same accuracy, the baseline model produces many false negatives (23) compared to (11). Changing the threshold is likely to improve the model's value. Thus, the last option is the most accurate assessment.
+
+## (m)
+
+Q: Using the `ROCR` package, what is the AUC value for the model?
+
+A:
+
+```{r 2_m}
+suppressMessages(library(ROCR))  # suppressMessages not critical - this is used as loading this library prints dependencies loaded
+
+# Make a prediction and find the model performance using predicted values
+predrocr_2 <- prediction(pred_2_h, test$Violator)
+auc_2 <- performance(predrocr_2, measure = "auc")@y.values[[1]]
+auc_2 # AUC value (area under curve) - the closer to 1, the better
+```
+
+The AUC value for the model is 0.895.
+
+## (n)
+
+Q: Describe the meaning of AUC in this context.
+
+-   The probability the model can correctly differentiate between a randomly selected parole violator and a randomly selected parole non-violator.
+-   The model's accuracy at logistic regression cutoff of 0.5.
+-   The model's accuracy at the logistic regression cutoff at which it is most accurate.
+
+A: The AUC can be interpreted as the probability that the model can correctly differentate between a randomly-selected parole violator, and a randomly-selected parole non-violator.
+
+## (o)
+
+Q: Our goal has been to predict the outcome of a parole decision, and we used a publicly available dataset of parole releases for predictions. In this final problem, we will evaluate a potential source of bias associated with our analysis. It is always important to evaluate a dataset for possible sources of bias. The dataset contains all individuals released from parole in 2004, either due to completing their parole term or violating the terms of their parole. However, it does not contain parolees who neither violated their parole nor completed their term in 2004, causing non-violators to be underrepresented. This is called "selection bias" or "selecting on the dependent variable," because only a subset of all relevant parolees were included in our analysis, based on our dependent variable in this analysis (parole violation). How could we improve our dataset to best address selection bias?
+
+-   There is no way to address this form of biasing.
+-   We should use the current dataset, expanded to include the missing parolees. Each added parolee should be labeled with Violator=0, because they have not yet had a violation.
+-   We should use the current dataset, expanded to include the missing parolees. Each added parolee should be labeled with Violator=NA, because the true outcome has not been observed for these individuals.
+-   We should use a dataset tracking a group of parolees from the start of their parole until either they violated parole or they completed their term
+
+A: Option 2 does not capture the true outcome of parolees since they are still either in jail, or not violated thus far. Option 3 does not help us to build a better model. Option 4 is the best, where they are tracked until they violate the parole or complete the term. However, such a dataset requires more effort to gather.
+
+```{r 2_end}
+setdiff(ls(), ls(pattern = "SETUP"))
+rm(list = setdiff(ls(), ls(pattern = "SETUP")))
+```
+
+# [Assignment 2.5]
+
+# Question 1
+
+## (a) {#onea}
+
+Q: Run a logit model with installation cost and operating cost as the only explanatory variables, without intercepts.
+
+A: We need to prepare the data for `mlogit()` using `mlogit.data()` first. The most important column is the column of choices, which we will use to get all of the other columns. We note that we assume that the data has been prepared and that the columns have the alternative names within them.
+
+We just read in the data first:
+
+```{r}
+rm(list=ls())
+#install.packages(mlogit)
+library(mlogit)
+heating <- read.csv("Heating.csv")
+head(heating)
+```
+
+For creating the required data we use the function mlogit.data, the different arguments are explained on the side. We need to choose columns 3 to 12 for the explanatory variables. This is also a wide data set.
+
+```{r}
+dataheat <- mlogit.data(heating,  # data.frame of data
+                    choice = "depvar",  # column name of choice
+                    shape = "wide",  # wide means each row is an observation
+                                     # long if each row is an alternative
+                    varying = c(3:12), # indices of varying columns for each alternative,
+                    sep = "."  # not necessary but still good to be clear
+                    )
+```
+
+Then, we can run `mlogit()` on the data:
+
+```{r}
+modelQ1_1 <- mlogit(depvar ~ ic + oc - 1, dataheat)  # -1 means no intercept
+```
+
+### i.
+
+Q: Do the estimated coefficients have the expected signs?
+
+A:
+
+```{r}
+coef(modelQ1_1)
+```
+
+The coefficients of both `ic` and `oc` are negative which makes sense since as the installation cost and operating cost for a system increases, the probability of choosing that system goes down.
+
+### ii.
+
+Q: Are both coefficients significantly different from zero?
+
+A: Since both p-values are below 2.2e-16 and we see three stars, we can claim that the coefficients are significantly different than zero.
+
+```{r}
+summary(modelQ1_1)
+```
+
+### iii.
+
+Q: Use the average of the probabilities to compute the predicted share. Compute the actual shares of houses with each system. How closely do the predicted shares match the actual shares of houses with each heating system?
+
+A: We can get the actual shares in the data with the following code:
+
+```{r}
+table(heating$depvar)/nrow(heating)
+
+predQ1_1<- predict(modelQ1_1, newdata = dataheat)
+apply(predQ1_1, 2, mean)
+```
+
+While the model captures the essence of the data reasonably, there are a few differences in the predicted shares. For example in `gc` and `gr` there seems to be quite a gap.
+
+### iv.
+
+Q: The ratio of coefficients usually provides economically meaningful information in discrete choice models. The willingness to pay (*wtp*) through higher installation cost for a one-dollar reduction in operating costs is the ratio of the operating cost coefficient to the installation cost coefficients. What is the estimated *wtp* from this model? Note that the annual operating cost recurs every year while the installation cost is a one-time payment. Does the result make sense?
+
+A: \begin{equation*}
+\frac{\beta_{oc}}{\beta_{ic}}=`r coef(modelQ1_1)["oc"]/coef(modelQ1_1)["ic"]`
+\end{equation*}
+
+According to this model, the decision-makers are willing to pay \$ 0.739 higher in installation cost for a \$1 reduction in operating cost. It seems unreasonable for the decision-maker to pay only 74 cents higher for a one-time payment for a \$1 reduction in annual costs.
+
+```{r}
+wtp1 <- as.numeric(coef(modelQ1_1)["oc"]/coef(modelQ1_1)["ic"])
+wtp1
+```
+
+## (b) {#oneb}
+
+Q: The present value ($PV$) of the future operating costs is the discounted sum of operating costs over the life of the system: $PV=\sum_{t=1}^{L}[OC/(1+r)^{t}]$ where *r* is the discount rate and *L* is the life of the system. As *L* rises, the PV approaches *OC/r*. Therefore, for a system with a sufficiently long life (which we will assume these systems have), a one-dollar reduction in *OC* reduces the present value of future operating costs by *(1/r)*. This means that if the person choosing the system were incurring the installation costs and the operating costs over the life of the system, and rationally traded-off the two at a discount rate of *r*, the decision-maker’s *wtp* for operating cost reductions would be *(1/r)*. Define a new variable `lcc` (lifecycle cost) that is defined as the sum of the installation cost and the (operating cost)/*r*. Run a logit model with the lifecycle cost as the only explanatory variable. Estimate the model for r = 0.12. Comment on the value of log-likelihood of the models obtained in [(a)](#onea) as compared to [(b)](#oneb).
+
+A: We first make a column called `lcc` with our `dataheat` object
+
+```{r}
+dataheat$lcc <- dataheat$ic + dataheat$oc/0.12
+```
+
+We then estimate with the `mlogit()` function, and call `logLik()` to get the log likelihood for this model:
+
+```{r 1_b2}
+modelQ1_2 <- mlogit(depvar ~ lcc - 1, dataheat)
+logLik(modelQ1_2)
+```
+
+The log likelihood of the model is `r logLik(modelQ1_2)`.
+
+For comparison, we retrieve the log likelihood of the model in part (a):
+
+```{r 1_b3}
+logLik(modelQ1_1)
+```
+
+The log likelihood of the model from (a) is `r logLik(modelQ1_1)`.
+
+Notice that the log likelihood of the model in (a) is higher (better, more likely) than that of the model in this part.
+
+## (c) {#onec}
+
+Q: Add alternative-specific constants to the model in (a). With *K* alternatives, at most *K-1* alternative specific constants can be estimated. The coefficient of *K-1* constants are interpreted as relative to *K*th alternative. Normalize the constant for the alternative `hp` to 0.
+
+A: Running `mlogit()` with a reference level. We observe that the share obtained here is the average share. This is guaranteed by the presence of alternative specific constants.
+
+```{r}
+modelQ1_3 <- mlogit(depvar ~ ic + oc, data = dataheat, reflevel = "hp")
+# This forces hp to be the reference level and the other alternative specific constants are relative to this
+```
+
+### i.
+
+Q: How well do the estimated probabilities match the shares of customers choosing each alternative in this case?
+
+A: We can get the predicted shares:
+
+```{r 1_c_i}
+predQ1_3<- predict(modelQ1_3, newdata=dataheat)
+shareQ1_3<- apply(predQ1_3,2,mean)
+shareQ1_3
+```
+
+We notice that the predicted shares match the actual shares exactly. This is guaranteed with the use of the alternative specific constants.
+
+### ii.
+
+Q: Calculate the *wtp* that is implied by the estimate. Is this reasonable?
+
+A: We calculate the willingness to pay:
+
+```{r 1_c_ii}
+unname(modelQ1_3$coefficients["oc"]/modelQ1_3$coefficients["ic"])
+```
+
+Hence: \begin{equation*}
+\frac{\beta_{oc}}{\beta_{ic}}=`r unname(modelQ1_3$coefficients["oc"]/modelQ1_3$coefficients["ic"])`
+\end{equation*} which suggests an extra down-payment of \$ 4.56 for a \$1 saving in annual operating costs. This seems more reasonable.
+
+### iii.
+
+Q: Suppose you had included constants for alternatives `ec`, `er`, `gc`, `hp` with the constant for alternative `gr` normalized to zero. What would be the estimated coefficient of the constant for alternative `gc`? Can you figure this out logically rather than actually estimating the model?
+
+A: Note that in modelQ1_3, the intercept for `gr` is 0.308. Here `gr` is the reference level. So in teh new model all the alternative specific constants are reduced by 0.308. Nothing else chages and the quality of fit remains unchanged.
+
+```{r}
+summary(modelQ1_3)
+
+### Check that you are right.
+modelQ1_4 <- mlogit(depvar ~ ic + oc, data = dataheat, reflevel = "gr")
+summary(modelQ1_4)
+
+```
+
+## (d)
+
+Now try some models with socio-demographic variables entering.
+
+### i.
+
+Q: Enter installation cost divided by income, instead of installation cost. With this specification, the magnitude of the installation cost coefficient is inversely related to income, such that high-income households are less concerned with installation costs than lower-income households. Does dividing installation cost by income seem to make the model better or worse than the model in [(c)](#onec)?
+
+A: Fitting the model first
+
+```{r}
+dataheat$iic <- dataheat$ic/dataheat$income
+modelQ1_5 <- mlogit(depvar ~ oc + iic, dataheat)
+summary(modelQ1_5)
+```
+
+The log-likelihood here is -1010.2 which is lower than -1008.2 for model4 and hence is worse. Moreover installation cost was significant in the earlier model and here the installation cost divided by income is not significant any more.
+
+### ii.
+
+Q: Instead of dividing installation cost by income, enter alternative-specific income effects. You can do this by using the `|` argument in the mlogit formula. What do the estimates imply about the impact of income on the choice of central systems versus room system? Do these income terms enter significantly?
+
+A:
+
+```{r}
+modelQ1_6 <- mlogit(depvar ~ oc + ic | income, dataheat)  
+summary(modelQ1_6)
+```
+
+All of the coefficients are negative which tells us that income rises, probability of choosing a heat pump increases relative to others, The magnitude of the income coefficient for `gr` is the greatest so we can infer that as income rises, probability of choosing gas rooms drops relative to others. None of the income terms are significant at the 5% significance level.
+
+## (e)
+
+Q: We now are going to consider the use of the logit model for prediction. Estimate a model with installation costs, operating costs, and alternative specific constants. Calculate the probabilities for each house explicitly.
+
+### i.
+
+Q: The California Energy Commission (CEC) is considering whether to offer rebates on heat pumps. The CEC wants to predict the effect of the rebates on the heating system choices of customers in California. The rebates will be set at 10% of the installation cost. Using the estimated coeffiients from the model, calculate predicted shares under this new installation cost instead of original value. How much do the rebates raise the share of houses with heat pumps?
+
+A: We create a new dataframe via copying and then changing a column, and then create a new `mlogit.data` object:
+
+```{r}
+heating1 <- heating
+heating1$ic.hp <- 0.9*heating1$ic.hp
+dataheat1 <- mlogit.data(heating1, choice = "depvar", shape = "wide", varying = c(3:12))
+```
+
+We can then use the old model as-is with the newly created data:
+
+```{r}
+predQ1_3a <- predict(modelQ1_3, newdata = dataheat1)
+shareQ1_3a <- apply(predQ1_3a, 2, mean)
+shareQ1_3a
+```
+
+The share of houses with heat pumps rises from 0.055 to 0.0645.
+
+### ii.
+
+Q: Suppose a new technology is developed that provides more efficient central heating. The new technology costs 200 more than the electric central heating system. However it saves 25% of the electricity such that its operating costs are 75% of the operating costs of `ec`. We want to predict the original market penetration of this technology. Note that there are now 6 alternatives instead of 5. Calculate the probability and predict the market share (average probability) for all 6 alternatives using the model that is estimated on the 5 alternatives. Use the original installation costs for the heat pumps rather than the reduced costs from the previous question. What is the predicted market share for the new technology? From which of the original five systems does the new technology draw the most customers?
+
+A: We want to compute the choice probabilities using closed form formula: \begin{equation*}
+\mathbb{P}\left(\text{Choice $k$=$j$}\right)=\frac{\exp\left(\sum_{i\in \mathcal{I}}\beta_{ij}x_{ij}\right)}{\sum_{l\in\mathcal{J}}\exp\left(\sum_{i\in \mathcal{I}}\beta_{il}x_{il}\right)}
+\end{equation*} where $i$ refers to each predictor, including the intercept. The intercept always has corresponding $x_{0j}$ value of 1, and coefficient of the intercept $\beta_{0j}$ for the reference level is 0. The indices $j$ refers to each choice or alternative while $k$ can be treated as the choice random variable and takes the values the choices are encoded as.
+
+Unfortunately, first we will need to introduce columns that the new choice represents, and then we can calculate this.
+
+```{r}
+df<- subset(heating, select = c(3:12))
+
+# New columns
+df$ic.eci <- df$ic.ec + 200
+df$oc.eci <- df$oc.ec * 0.75
+
+```
+
+We will use modelQ1_3 to compute the new choice probabilities
+
+```{r}
+df$hpexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.hp+modelQ1_3$coefficients["ic"]*df$ic.hp)
+
+df$ecexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.ec+modelQ1_3$coefficients["ic"]*df$ic.ec+modelQ1_3$coefficients["(Intercept):ec"])
+
+df$erexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.er+modelQ1_3$coefficients["ic"]*df$ic.er+modelQ1_3$coefficients["(Intercept):er"])
+
+df$gcexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.gc+modelQ1_3$coefficients["ic"]*df$ic.gc+modelQ1_3$coefficients["(Intercept):gc"])
+
+df$grexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.gr+modelQ1_3$coefficients["ic"]*df$ic.gr+modelQ1_3$coefficients["(Intercept):gr"])
+
+df$eciexp<-exp(modelQ1_3$coefficients["oc"]*df$oc.eci+modelQ1_3$coefficients["ic"]*df$ic.eci+modelQ1_3$coefficients["(Intercept):ec"])
+               
+               
+
+df$sumexp <-apply(subset(df,select=c(13:17)),1,sum)
+df$sumexpnew <-apply(subset(df,select=c(13:18)),1,sum)
+
+
+df$hp <-df$hpexp/df$sumexp
+df$ec <-df$ecexp/df$sumexp
+df$er <-df$erexp/df$sumexp
+df$gc <-df$gcexp/df$sumexp
+df$gr <-df$grexp/df$sumexp
+
+df$hpnew <-df$hpexp/df$sumexpnew
+df$ecnew <-df$ecexp/df$sumexpnew
+df$ernew <-df$erexp/df$sumexpnew
+df$gcnew <-df$gcexp/df$sumexpnew
+df$grnew <-df$grexp/df$sumexpnew
+df$ecinew <-df$eciexp/df$sumexpnew
+
+
+
+
+oldprob<-subset(df,select=c(21:25))
+newprob<-subset(df,select=c(26:31))
+
+
+marketshareold<-apply(oldprob,2,mean)
+
+
+marketsharenew<-apply(newprob,2,mean)
+
+
+marketshareold
+
+marketsharenew
+
+```
+
+\pagebreak
+
+The new technology is predicted to have a marketshare of about 10.3%
+
+The most market share is drawn from gas central whose marketshare falls from 63.67% to 57.15%. Note that from the independence of irrelevent alternatives (IIA) property, the ratio of market shares remains the same irrespective of other alternatives in the set. The drop in percentage is roughly 10% from each system due to IIA. It might have been expected that the new electric central heating system would possibly draw more from the old electric central heating system rather than gas central (which just happens to have the greatest market share) but the multinomial logit with the IIA property is unable to account for this.
+
+\pagebreak
+
+# Question 2
+
+Suppose we perform best subset, forward stepwise, and backward stepwise selection on a single set. For each approach, we obtain *p*+1 models, containing 0, 1, 2, ..., *p* predictors. Provide your answers for the following questions:
+
+## (a)
+
+Q: Which of the three models with *k* predictors has the smallest training sum of squared errors?
+
+A: By definition, the best subset selection would select a subset of the predictors that would minimize training sum of squared errors, for any *k*.
+
+## (b)
+
+Q: Which of the three models with *k* predictors has the smallest test sum of squared errors?
+
+A: This is impossible to say as information of the test set is not considered in any of the three methods named. Fitting well on the training set does not necessarily generalize to fitting well on the test set.
+
+## (c)
+
+Q: Are the following statements **True** or **False**:
+
+### i.
+
+Q: The predictors in the *k*-variable model identified by forward stepwise selection are a subset of the predictors in the (*k*+1)-variable model identified by forward stepwise selection.
+
+A: True. Each step in the forward stepwise selection method corresponds to adding only 1 variable to the previous set, typically in greedy-like manner, and removals are never done.
+
+### ii.
+
+Q: The predictors in the *k*-variable model identified by backward stepwise selection are a subset of the predictors in the (*k*+1)-variable model identified by backward stepwise selection.
+
+A: True. In backward stepwise selection, we drop 1 variable at each step.
+
+### iii.
+
+Q: The predictors in the *k*-variable model identified by backward stepwise selection are a subset of the predictors in the (*k*+1)-variable model identified by forward stepwise selection.
+
+A: False. This is clearly not true since forward and backward selection may collect a very different subset of sizes (*k*+1) and *k* respectively
+
+### iv.
+
+Q: The predictors in the *k*-variable model identified by forward stepwise selection are a subset of the predictors in the (*k*+1)-variable model identified by backward stepwise selection.
+
+A: False. For a similar reason as mentioned in part (iii).
+
+### v.
+
+Q: The predictors in the *k*-variable model identified by best stepwise selection are a subset of the predictors in the (*k*+1)-variable model identified by best stepwise selection.
+
+A: False. For a similar reason as mentioned in part (iii).
+
+\pagebreak
+
+# Question 3
+
+## (a)
+
+Q: Split the data set into a training set and a test set using the seed 1 and the `sample()` function with 80% in the training set and 20% in the test set. How many observations are there in the training and test sets?
+
+A:
+
+```{r}
+college <- read.csv("College.csv")
+# str(college)
+set.seed(1)
+trainid <- sample(1:nrow(college), 0.8*nrow(college))
+testid <- -trainid
+train <- college[trainid,]
+test <- college[testid,]
+nrow(train) #80%
+nrow(test) #20%
+```
+
+There are `r nrow(train)` observations in the training set, and `r nrow(test)` observations in the test set.
+
+## (b) {#fourb}
+
+Q: Fit a linear model using least squares on the training set. What is the average sum of squared error of the model on the training set? Report on the average sum of squared error on the test set obtained from the model.
+
+A:
+
+```{r}
+modelQ4_1 <- lm(Apps ~ ., data = train)
+
+#summary(modelQ4_1)
+
+# sum squared error on training data
+SSE_tr <- mean(modelQ4_1$residuals^2) 
+SSE_tr
+
+predQ4_1 <- predict(modelQ4_1, newdata = test)
+
+# sum squared error on test data
+SSE_te <- mean((test$Apps - predQ4_1)^2) 
+SSE_te
+```
+
+The average sum of squared error on the training set is 958950.3 while the average sum of squared error on the test set is 1567324.
+
+## (c)
+
+Q: Use the backward stepwise selection method to select the variables for the regression model on the training set. Which is the first variable dropped from the set?
+
+A:
+
+```{r}
+library(leaps)
+modelQ4_2sub <- regsubsets(Apps~., data = train,
+                           nvmax = NULL,  # alternatively, 17
+                           method = "backward")
+summary(modelQ4_2sub)
+```
+
+From the results we can see that the first variable to be dropped from the set is `Terminal`.
+
+## (d) {#fourd}
+
+Q: Plot the adjusted-$R^{2}$ for all these models. If we choose the model based on the best adjusted-$R^{2}$ value, which variables should be included in the model?
+
+A: The plot are done as follows
+
+```{r}
+plot(summary(modelQ4_2sub)$adjr2)
+
+# best step number (model with highest adjusted r^2) 
+which.max(summary(modelQ4_2sub)$adjr2)
+n_vars <- which.max(summary(modelQ4_2sub)$adjr2) # number of variables to be included 
+coef_vars <- coef(modelQ4_2sub, n_vars) # coefficients of variables to be included
+sel_vars <- names(coef_vars) # names of variables to be included (includes intercept)
+sel_vars
+```
+
+The model with the best adjusted-$R^{2}$ is the model with `r n_vars` variables which are `PrivateYes, Accept, Enroll`, `Top10perc, Top25perc, F.Undergrad, P.Undergrad`, `Outstate, Room.Board, PhD, S.F.Ratio, Expend, Grad.Rate` along with the `Intercept` term. The variables `Books, Terminal, perc.alumni, Personal` are dropped from the model.
+
+## (e)
+
+Q: Use the model identified in part [(d)](#fourd) to estimate the average sum of squared test error. Does this improve on the model in part [(b)](#fourb) in the prediction accuracy?
+
+A: We first build the model using the selected variables then find the average sum of squared test error:
+
+```{r}
+# note: in our dataset, only 'Private' variable exists ('PrivateYes' was created by the model since 'Private' was a factor variable)
+sel_vars <- sub("PrivateYes","Private",sel_vars) # replace privateyes with private
+sel_vars <- sel_vars[2:n_vars] # remove the '(Intercept)' from sel_vars
+sel_vars # we use this to create our linear model
+
+# instead of typing the variables manually, use paste and collapse function to create string: "App ~ var1 + var2 + ... + ..."
+modelQ4_3 <- lm(
+  paste("Apps",
+        paste(sel_vars,
+              collapse = " + "),
+        sep = " ~ "),
+  data = train)
+
+summary(modelQ4_3)
+
+predQ4_3 <- predict(modelQ4_3, newdata = test)
+
+SSE_te_d <- mean((test$Apps - predQ4_3)^2) # using model in d
+SSE_te_d
+```
+
+The test MSE is 1588185 which is more than 1567324, so the new model seems to reduce prediction accuracy.
+
+## (f)
+
+Q: Fit a LASSO model on the training set. Use the command to define the grid for $\lambda$:
+
+`grid <- 10^seq(10, -2, length = 100)`
+
+Plot the behavior of the coefficients as $\lambda$ changes.
+
+A: First we can initialize the `grid` then run `glmnet` to fit the LASSO model with differing $\lambda$ values:
+
+```{r 4_f1}
+library(glmnet)
+# define grid for lambda
+grid <- 10^seq(10, -2, length = 100)
+
+Xglm <- model.matrix(Apps~., college)
+yglm <- college$Apps
+modelQ4_4 <- glmnet(Xglm[trainid,], yglm[trainid], lambda = grid)
+```
+
+Then we plot,
+
+```{r}
+plot(modelQ4_4, xvar = "lambda")
+```
+
+> ## Key Inferences from the Paths
+>
+> 1.  **Feature Selection:** Notice that on the far left, almost all coefficients are zero (flat lines on the $y=0$ axis). As you move right, the coefficients "wake up" and begin to move away from zero. This visualizes the **feature selection process** where predictors are added to the model.
+>
+> 2.  **Dominant Predictor:** The **black line** represents a predictor with a very large impact. Its coefficient value rapidly decreases (in magnitude, moving away from 0 and towards a large negative value) as regularization is relaxed (moving right). This suggests it is the **most significant predictor** in the model.
+>
+> 3.  **Stability:** The other lines (blue, green, cyan) remain clustered around zero and have much smaller absolute values, indicating they are **less influential** than the predictor represented by the black line.
+>
+> In summary, the plot illustrates the **effect of the** $\lambda$ penalty on the magnitude and selection of the model's coefficients, showing the trade-off between model simplicity (few non-zero coefficients) and model fit (larger coefficient values).
+
+## (g)
+
+Q: Set the seed to 1 before running the cross-validation with LASSO to choose the best $\lambda$. Use 10-fold cross validation. Report the test error obtained, along with the number of non-zero coefficient estimates.
+
+A:
+
+```{r}
+set.seed(1)
+cvmodelQ4_4 <- cv.glmnet(x = Xglm[trainid,], y = yglm[trainid],
+                         nfolds = 10, lambda = grid)  # 10-fold cross-validation
+cvmodelQ4_4$lambda.min
+
+coef(modelQ4_4,s=cvmodelQ4_4$lambda.min)
+cvmodelQ4_4$glmnet.fit
+
+predQ4_4 <- predict(modelQ4_4,
+                    s=cvmodelQ4_4$lambda.min,
+                    newx=Xglm[testid,])
+
+te <- mean((predQ4_4 - yglm[testid])^2)  # test error of best model
+te
+```
+
+The number of non-zero coefficients is 17. This means that the model is essentially the same as the model in part [(b)](#fourb) which is the full model. The test error of 1565789 is approximately the same.
